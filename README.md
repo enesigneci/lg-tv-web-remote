@@ -69,6 +69,26 @@ PORT=8080 npm start
 
 Environment variables: `TV_HOST`, `TV_MAC`, `PORT`, `MDNS_NAME`, `KEY_FILE`, `SEARCH_ENGINE`. You can also pass the TV's IP as an argument: `node server.js 192.168.1.50`.
 
+## Notifications on the TV
+
+`POST /notify` shows a message in the middle of the TV screen that closes itself after a few seconds:
+
+```bash
+curl -X POST http://kumanda.local/notify -H 'Content-Type: application/json' \
+  -d '{"title": "Dishwasher", "message": "Done!", "seconds": 10}'
+```
+
+From Home Assistant, add a `rest_command` and call it from any automation:
+
+```yaml
+rest_command:
+  tv_notify:
+    url: http://kumanda.local/notify
+    method: POST
+    content_type: application/json
+    payload: '{"title": "{{ title }}", "message": "{{ message }}"}'
+```
+
 ## How it works
 
 - The server talks to the TV over the **webOS SSAP** protocol (`wss://TV:3001`) using the [lgtv2](https://github.com/hobbyquaker/lgtv2) library. Text goes through `com.webos.service.ime`; keys and the touchpad use the network input socket.

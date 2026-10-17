@@ -401,6 +401,34 @@ async function youtubeSearch(q, hl = 'en') {
 
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
+    if (url.pathname === '/notify' && req.method === 'POST') {
+        // Shows a message on the TV, e.g. from a Home Assistant rest_command.
+        // Body: {"message": "...", "title": "...", "seconds": 10} or plain text.
+        // A centered alert is used because webOS 24 silently drops toasts in full-screen apps.
+        let body = '';
+        for await (const chunk of req) body += chunk;
+        let opts = { message: body };
+        try { opts = { ...opts, ...JSON.parse(body) }; } catch {}
+        const message = String(opts.message ?? '').trim().slice(0, 300);
+        const seconds = Math.min(Math.max(Number(opts.seconds) || 10, 3), 120);
+        if (!message || !tvReady) {
+            res.writeHead(!message ? 400 : 503);
+            res.end();
+            return;
+        }
+        const result = await tv.request('ssap://system.notifications/createAlert', {
+            title: String(opts.title || '').slice(0, 80),
+            message,
+            buttons: [{ label: 'OK', focus: true, buttonType: 'ok' }],
+        }).catch((err) => ({ error: err.message }));
+        if (result.alertId) {
+            setTimeout(() => tv.request('ssap://system.notifications/closeAlert', { alertId: result.alertId }).catch(() => {}), seconds * 1000);
+        }
+        console.log('Notify:', message);
+        res.writeHead(result.error ? 502 : 200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+        return;
+    }
     if (url.pathname === '/epg') {
         // Current and next program for the requested channels (the ones visible on the phone).
         const ids = (url.searchParams.get('ids') || '').split(',').filter(Boolean).slice(0, 40);
