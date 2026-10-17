@@ -27,7 +27,7 @@ TV'nin IP ve MAC adresi ağda otomatik bulunur. Bunun için önce SSDP, olmazsa 
 Sunucu Home Assistant'la birlikte sürekli açık kalır ve açılışta kendiliğinden başlar.
 
 1. Home Assistant'ta **Ayarlar → Eklentiler → Eklenti Mağazası → ⋮ → Depolar** menüsüne gir.
-2. `https://github.com/enesigneci/lg-tv-kumanda` adresini ekle.
+2. `https://github.com/enesigneci/lg-tv-web-remote` adresini ekle.
 3. **TV Kumanda** eklentisini kur ve başlat.
 4. Telefondan **http://kumanda.local** adresini aç. Bu ad çözülmezse Home Assistant'ın IP adresini kullan.
 
