@@ -416,9 +416,12 @@ const server = http.createServer(async (req, res) => {
             res.end();
             return;
         }
+        // webOS 24 ignores the alert's title field and renders the message as HTML, so the title
+        // goes on its own line and user text is escaped (newlines become <br>).
+        const html = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '<br>');
+        const title = String(opts.title || '').trim().slice(0, 80);
         const result = await tv.request('ssap://system.notifications/createAlert', {
-            title: String(opts.title || '').slice(0, 80),
-            message,
+            message: title ? `${html(title)}<br>${html(message)}` : html(message),
             buttons: [{ label: 'OK', focus: true, buttonType: 'ok' }],
         }).catch((err) => ({ error: err.message }));
         if (result.alertId) {
