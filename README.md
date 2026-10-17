@@ -4,6 +4,13 @@ A small local server that lets you control an LG webOS TV from your phone's brow
 
 Built and tested with an LG C4 (OLED55C46LA, webOS 24). It should work on other webOS TVs as well.
 
+<p align="center">
+  <img src="docs/screenshots/remote.png" width="200" alt="Remote tab with keyboard input, arrow keys and media keys">
+  <img src="docs/screenshots/youtube.png" width="200" alt="YouTube tab with search results">
+  <img src="docs/screenshots/web.png" width="200" alt="Web tab with address bar and touchpad">
+  <img src="docs/screenshots/apps.png" width="200" alt="Apps tab with HDMI inputs and installed apps">
+</p>
+
 ## Features
 
 - **Keyboard**: Text you type on the phone goes straight into the TV's text field. Deletes, Enter and autocorrect are kept in sync.
