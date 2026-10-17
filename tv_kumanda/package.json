@@ -1,6 +1,6 @@
 {
   "name": "lg-tv-web-remote",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "Control an LG webOS TV from your phone's browser: keyboard, YouTube, browser, apps, volume and power",
   "private": true,
   "license": "MIT",

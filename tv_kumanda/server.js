@@ -502,10 +502,20 @@ server.listen(PORT, () => {
         const a = { name: HOSTNAME, type: 'A', ttl: 120, flush: true, data: ip };
         // Tells resolvers there is no IPv6 address, so AAAA lookups don't stall for seconds (RFC 6762 §6.1).
         const nsec = { name: HOSTNAME, type: 'NSEC', ttl: 120, flush: true, data: { nextDomain: HOSTNAME, rrtypes: ['A'] } };
-        mdns.on('query', (query) => {
-            const types = query.questions.filter((q) => q.name.toLowerCase() === HOSTNAME).map((q) => q.type);
-            if (types.includes('A') || types.includes('ANY')) mdns.respond({ answers: [a], additionals: [nsec] });
-            else if (types.includes('AAAA')) mdns.respond({ answers: [nsec], additionals: [a] });
+        mdns.on('query', (query, rinfo) => {
+            const ours = query.questions.filter((q) => q.name.toLowerCase() === HOSTNAME);
+            if (!ours.length) return;
+            const types = ours.map((q) => q.type);
+            // A for A/ANY; NSEC ("nothing else exists") for AAAA, HTTPS (type 65, asked by iOS Safari) and the rest.
+            const wantsA = types.includes('A') || types.includes('ANY');
+            const wantsOther = types.some((t) => t !== 'A');
+            const answers = [...(wantsA ? [a] : []), ...(wantsOther ? [nsec] : [])];
+            const additionals = [a, nsec].filter((r) => !answers.includes(r));
+            const res = { answers, additionals };
+            mdns.respond(res);
+            // iPhones set the "unicast response" (QU) bit and may only accept a direct reply (RFC 6762 §5.4).
+            const qu = ours.some((q) => String(q.class).includes('32769'));
+            if (qu && rinfo && !rinfo.address.startsWith('172.')) mdns.respond(res, rinfo);
         });
         mdns.on('error', (err) => console.log('mDNS error:', err.message));
     }
