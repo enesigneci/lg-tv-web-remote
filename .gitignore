@@ -1,0 +1,5 @@
+node_modules/
+# TV eşleşme anahtarı: TV'yi kontrol etme yetkisi verir, asla paylaşma.
+tv-key
+*.log
+.DS_Store

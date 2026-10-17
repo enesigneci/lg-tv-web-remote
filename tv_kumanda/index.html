@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111">
+<title>TV Kumanda</title>
+<style>
+  :root { --bg:#111; --fg:#eee; --muted:#888; --btn:#232323; --btn-active:#3a3a3a; --accent:#c8102e; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px -apple-system, system-ui, sans-serif;
+         padding:16px; padding-top:max(16px, env(safe-area-inset-top)); }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  h1 { font-size:18px; margin:0; }
+  #status { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  #status::before { content:""; width:8px; height:8px; border-radius:50%; background:#666; }
+  #status.ok::before { background:#3c3; }
+  #status.warn::before { background:#fc3; }
+  #text, .field { width:100%; font-size:20px; padding:14px; border-radius:12px; border:1px solid #333;
+          background:#1b1b1b; color:var(--fg); outline:none; }
+  #text:focus, .field:focus { border-color:var(--accent); }
+  .hint { color:var(--muted); font-size:13px; margin:8px 2px 16px; }
+  .row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:10px; }
+  .row.four { grid-template-columns:repeat(4,1fr); }
+  button { border:0; border-radius:12px; background:var(--btn); color:var(--fg); font-size:17px;
+           padding:16px 0; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+  button:active { background:var(--btn-active); }
+  button.primary { background:var(--accent); }
+  .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:300px; margin:18px auto; }
+  .pad button { aspect-ratio:1.4; font-size:22px; }
+  .tabs { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; background:#1b1b1b; padding:4px; border-radius:12px; margin-bottom:14px; }
+  .tabs button { padding:10px 0; font-size:13px; background:transparent; }
+  .tabs button.on { background:var(--btn-active); }
+  .hidden { display:none !important; }
+  .bar { display:grid; grid-template-columns:1fr 1.1fr 1fr 1.1fr; gap:8px; margin-bottom:14px; }
+  .bar button { padding:12px 0; font-size:17px; }
+  #mute { font-variant-numeric:tabular-nums; }
+  #mute.muted { color:#fc3; }
+  #power { background:#3a1414; color:#ff6b6b; }
+  #ytForm, #webForm { display:flex; gap:8px; }
+  #ytForm input, #webForm input { flex:1; min-width:0; }
+  #ytForm button, #webForm button { padding:0 18px; }
+  #ytResults { margin-top:14px; display:flex; flex-direction:column; gap:10px; }
+  .vid { display:flex; gap:10px; background:#1b1b1b; border-radius:12px; overflow:hidden; text-align:left; padding:0; }
+  .vid img { width:136px; aspect-ratio:16/9; object-fit:cover; flex-shrink:0; }
+  .vid div { padding:8px 8px 8px 0; min-width:0; }
+  .vid b { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:15px; font-weight:600; }
+  .vid small { color:var(--muted); font-size:12px; display:block; margin-top:4px; }
+  #touchpad { height:280px; border-radius:16px; background:#1b1b1b; border:1px solid #2c2c2c; touch-action:none;
+              display:flex; align-items:center; justify-content:center; color:#555; font-size:14px; text-align:center;
+              margin-bottom:10px; user-select:none; -webkit-user-select:none; }
+  #touchpad.active { border-color:var(--accent); }
+  h2 { font-size:14px; color:var(--muted); font-weight:600; margin:4px 2px 10px; }
+  .apps { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:10px; margin-bottom:18px; }
+  .app { padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:8px; font-size:12px; line-height:1.25; }
+  .app img { width:52px; height:52px; object-fit:contain; border-radius:10px; }
+  .app span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .app.off { opacity:.45; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TV Kumanda</h1>
+  <span id="status">bağlanıyor…</span>
+</header>
+
+<div class="bar">
+  <button data-btn="VOLUMEDOWN" aria-label="Sesi kıs">🔉 −</button>
+  <button id="mute" data-btn="MUTE" aria-label="Sessiz">🔇</button>
+  <button data-btn="VOLUMEUP" aria-label="Sesi aç">🔊 +</button>
+  <button id="power" aria-label="TV'yi aç/kapat">⏻ Güç</button>
+</div>
+
+<div class="tabs">
+  <button id="tabKb" class="on">⌨ Kumanda</button>
+  <button id="tabYt">▶ YouTube</button>
+  <button id="tabWeb">🌐 Web</button>
+  <button id="tabApps">▦ Uygulama</button>
+</div>
+
+<section id="kbView">
+  <input id="text" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"
+         placeholder="Buraya yaz, TV'de görünsün" enterkeyhint="send">
+  <div class="hint">TV'de önce bir arama kutusu seç, ekran klavyesi açılsın. Sonra buraya yaz.</div>
+
+  <div class="row">
+    <button data-act="back1">⌫ Sil</button>
+    <button data-act="clear">Temizle</button>
+    <button data-act="enter" class="primary">Enter ⏎</button>
+  </div>
+
+  <div class="pad">
+    <span></span><button data-btn="UP">▲</button><span></span>
+    <button data-btn="LEFT">◀</button><button data-btn="ENTER" class="primary">OK</button><button data-btn="RIGHT">▶</button>
+    <span></span><button data-btn="DOWN">▼</button><span></span>
+  </div>
+  <div class="row">
+    <button data-btn="BACK">↩ Geri</button>
+    <button data-btn="HOME">⌂ Ana</button>
+    <button data-btn="MENU">⚙ Ayar</button>
+  </div>
+  <div class="row four">
+    <button data-btn="REWIND" aria-label="Geri sar">⏪</button>
+    <button data-btn="PLAY" aria-label="Oynat">▶</button>
+    <button data-btn="PAUSE" aria-label="Duraklat">⏸</button>
+    <button data-btn="FASTFORWARD" aria-label="İleri sar">⏩</button>
+  </div>
+</section>
+
+<section id="ytView" class="hidden">
+  <form id="ytForm">
+    <input id="ytQ" class="field" type="search" placeholder="YouTube'da ara" enterkeyhint="search" autocomplete="off">
+    <button class="primary">Ara</button>
+  </form>
+  <div id="ytResults"></div>
+</section>
+
+<section id="webView" class="hidden">
+  <form id="webForm">
+    <input id="webQ" class="field" type="text" inputmode="url" placeholder="Adres, arama ya da YouTube linki" enterkeyhint="go"
+           autocomplete="off" autocapitalize="none" spellcheck="false">
+    <button class="primary">Aç</button>
+  </form>
+  <div class="hint">Adres yazarsan TV tarayıcısında açılır, başka bir şey yazarsan Yandex'te aranır. YouTube linki YouTube uygulamasında açılır.</div>
+  <div id="webStatus" class="hint"></div>
+  <div id="touchpad">Touchpad<br>Sürükle: imleç · Dokun: tıkla<br>İki parmak: kaydır</div>
+  <div class="row">
+    <button data-btn="BACK">↩ Geri</button>
+    <button data-btn="HOME">⌂ Ana</button>
+    <button data-btn="ENTER">OK</button>
+  </div>
+</section>
+
+<section id="appsView" class="hidden">
+  <div id="appsEmpty" class="hint">TV bağlanınca uygulamalar burada görünür.</div>
+  <h2 id="inputsTitle" class="hidden">Girişler</h2>
+  <div id="inputList" class="apps"></div>
+  <h2 id="appsTitle" class="hidden">Uygulamalar</h2>
+  <div id="appList" class="apps"></div>
+</section>
+
+<script>
+  const input = document.getElementById('text');
+  const statusEl = document.getElementById('status');
+  let ws, last = '';
+
+  function setStatus(s) {
+    const map = { connected: ['TV bağlı', 'ok'], prompt: ["TV'de isteği onayla", 'warn'],
+                  disconnected: ['TV bağlı değil', ''], offline: ['sunucu yok', ''] };
+    const [label, cls] = map[s] || [s, ''];
+    statusEl.textContent = label;
+    statusEl.className = cls;
+  }
+
+  function setVolume(v) {
+    if (!v) { mute.textContent = '🔇'; mute.classList.remove('muted'); return; }
+    mute.textContent = v.muted ? '🔇 ' + v.level : '🔈 ' + v.level;
+    mute.classList.toggle('muted', !!v.muted);
+  }
+
+  function renderApps(list) {
+    const ins = list.filter((a) => a.kind === 'input'), apps = list.filter((a) => a.kind === 'app');
+    appsEmpty.classList.toggle('hidden', list.length > 0);
+    inputsTitle.classList.toggle('hidden', !ins.length);
+    appsTitle.classList.toggle('hidden', !apps.length);
+    for (const [el, items] of [[inputList, ins], [appList, apps]]) {
+      el.textContent = '';
+      for (const a of items) {
+        const b = document.createElement('button');
+        b.className = 'app' + (a.kind === 'input' && a.connected === false ? ' off' : '');
+        b.innerHTML = '<img alt=""><span></span>';
+        const img = b.querySelector('img');
+        img.src = `/icon?k=${encodeURIComponent(a.kind + ':' + a.id)}`;
+        img.onerror = () => img.remove();
+        b.querySelector('span').textContent = a.title;
+        b.onclick = () => send({ type: a.kind === 'input' ? 'input' : 'launch', id: a.id });
+        el.append(b);
+      }
+    }
+  }
+
+  function connect() {
+    ws = new WebSocket(`ws://${location.host}`);
+    ws.onmessage = (e) => {
+      const m = JSON.parse(e.data);
+      if (m.status) setStatus(m.status);
+      if ('volume' in m) setVolume(m.volume);
+      if (m.apps) renderApps(m.apps);
+    };
+    ws.onclose = () => { setStatus('offline'); setTimeout(connect, 1500); };
+  }
+  connect();
+
+  function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+
+  // Kutudaki metnin önceki hâline göre farkı bul: ortak baştan sonrasını sil, yenisini yaz.
+  function sync() {
+    const now = input.value;
+    let i = 0;
+    while (i < last.length && i < now.length && last[i] === now[i]) i++;
+    const del = last.length - i, ins = now.slice(i);
+    if (del || ins) send({ type: 'edit', del, ins });
+    last = now;
+  }
+
+  input.addEventListener('input', sync);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sync(); send({ type: 'enter' }); input.value = last = ''; }
+    else if (e.key === 'Backspace' && input.value === '') send({ type: 'edit', del: 1, ins: '' });
+  });
+
+  function keepFocus(e) { e.preventDefault(); }
+  document.querySelectorAll('button').forEach((b) => b.addEventListener('mousedown', keepFocus));
+
+  document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
+    const act = b.dataset.act;
+    if (act === 'enter') { sync(); send({ type: 'enter' }); input.value = last = ''; }
+    else if (act === 'back1') {
+      if (input.value) { input.value = input.value.slice(0, -1); sync(); }
+      else send({ type: 'edit', del: 1, ins: '' });
+    }
+    else if (act === 'clear') { send({ type: 'edit', del: Math.max(last.length, 50), ins: '' }); input.value = last = ''; }
+  }));
+
+  document.querySelectorAll('[data-btn]').forEach((b) => b.addEventListener('click', () => {
+    if (navigator.vibrate) navigator.vibrate(10);
+    send({ type: 'button', name: b.dataset.btn });
+  }));
+  power.onclick = () => { if (navigator.vibrate) navigator.vibrate(30); send({ type: 'power' }); };
+
+  const tabs = { kb: [tabKb, kbView], yt: [tabYt, ytView], web: [tabWeb, webView], apps: [tabApps, appsView] };
+  function show(name) {
+    for (const [k, [tab, view]] of Object.entries(tabs)) {
+      tab.classList.toggle('on', k === name);
+      view.classList.toggle('hidden', k !== name);
+    }
+    try { localStorage.setItem('tab', name); } catch {}
+  }
+  tabKb.onclick = () => show('kb');
+  tabYt.onclick = () => { show('yt'); ytQ.focus(); };
+  tabWeb.onclick = () => show('web');
+  tabApps.onclick = () => show('apps');
+  try { const t = localStorage.getItem('tab'); if (tabs[t]) show(t); } catch {}
+
+  webForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = webQ.value.trim();
+    if (!q) return;
+    send({ type: 'open', q });
+    webStatus.textContent = `TV'de açılıyor: ${q}`;
+    webQ.value = '';
+    webQ.blur();
+  });
+
+  ytForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const q = ytQ.value.trim();
+    if (!q) return;
+    ytQ.blur();
+    ytResults.textContent = 'Aranıyor…';
+    try {
+      const list = await (await fetch('/yt?q=' + encodeURIComponent(q))).json();
+      ytResults.textContent = list.length ? '' : 'Sonuç yok.';
+      for (const v of list) {
+        const b = document.createElement('button');
+        b.className = 'vid';
+        b.innerHTML = '<img loading="lazy"><div><b></b><small></small></div>';
+        b.querySelector('img').src = v.thumb;
+        b.querySelector('b').textContent = v.title;
+        b.querySelector('small').textContent = `${v.channel || ''} · ${v.duration}`;
+        b.onclick = () => send({ type: 'play', id: v.id });
+        ytResults.append(b);
+      }
+    } catch { ytResults.textContent = 'Arama başarısız.'; }
+  });
+
+  // Touchpad: tek parmak imleci taşır, kısa dokunuş tıklar, iki parmak kaydırır.
+  // Hareketler biriktirilip kare başına bir kez gönderilir ki sunucu boğulmasın.
+  const SPEED = 1.6;
+  let touch = null, acc = { dx: 0, dy: 0, sx: 0, sy: 0 }, frame = 0;
+  function flush() {
+    frame = 0;
+    if (acc.dx || acc.dy) send({ type: 'pointer', kind: 'move', dx: Math.round(acc.dx), dy: Math.round(acc.dy) });
+    if (acc.sy || acc.sx) send({ type: 'pointer', kind: 'scroll', dx: Math.round(acc.sx), dy: Math.round(acc.sy) });
+    acc = { dx: 0, dy: 0, sx: 0, sy: 0 };
+  }
+  function center(t) {
+    let x = 0, y = 0;
+    for (const p of t) { x += p.clientX; y += p.clientY; }
+    return { x: x / t.length, y: y / t.length };
+  }
+  touchpad.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const c = center(e.touches);
+    touch = { ...c, start: Date.now(), moved: 0, fingers: Math.max(touch?.fingers || 0, e.touches.length) };
+    touchpad.classList.add('active');
+  }, { passive: false });
+  touchpad.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!touch) return;
+    const c = center(e.touches), dx = c.x - touch.x, dy = c.y - touch.y;
+    touch.x = c.x; touch.y = c.y; touch.moved += Math.abs(dx) + Math.abs(dy);
+    if (e.touches.length >= 2) { acc.sx += -dx; acc.sy += -dy; }
+    else { acc.dx += dx * SPEED; acc.dy += dy * SPEED; }
+    if (!frame) frame = requestAnimationFrame(flush);
+  }, { passive: false });
+  touchpad.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (e.touches.length) { const c = center(e.touches); touch.x = c.x; touch.y = c.y; return; }
+    if (touch && touch.fingers === 1 && touch.moved < 10 && Date.now() - touch.start < 300) {
+      if (navigator.vibrate) navigator.vibrate(10);
+      send({ type: 'pointer', kind: 'click' });
+    }
+    touch = null;
+    touchpad.classList.remove('active');
+  }, { passive: false });
+</script>
+</body>
+</html>

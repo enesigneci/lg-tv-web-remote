@@ -1,0 +1,420 @@
+'use strict';
+
+// Telefon tarayıcısından LG webOS TV'yi kontrol eden köprü sunucusu.
+// Kullanım: node server.js [tv-ip]   (IP verilmezse TV ağda otomatik bulunur)
+
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const dgram = require('dgram');
+const { WebSocketServer } = require('ws');
+const LGTV = require('lgtv2');
+const lounge = require('./lounge');
+const multicastDns = require('multicast-dns');
+
+// Home Assistant eklentisi olarak çalışırken ayarlar /data/options.json'dan gelir.
+let options = {};
+try {
+    options = JSON.parse(fs.readFileSync('/data/options.json', 'utf8'));
+} catch {}
+
+let TV_HOST = process.argv[2] || process.env.TV_HOST || options.tv_host || '';
+// TV kapalıyken ağdan uyandırmak için; boşsa TV'nin DIAL duyurusundaki WAKEUP MAC'inden öğrenilir.
+let TV_MAC = process.env.TV_MAC || options.tv_mac || '';
+const PORT = Number(process.env.PORT || options.port) || 80;
+const HOSTNAME = process.env.MDNS_NAME || options.hostname || 'kumanda.local';
+
+let tv = null;
+
+let tvReady = false;
+let pointer = null;
+let volume = null; // { level, muted }
+let apps = [];     // { id, title, kind: 'app' | 'input' } — ikon URL'leri iconUrls'de
+const iconUrls = new Map();
+const iconCache = new Map();
+
+function broadcast(msg) {
+    const data = JSON.stringify(msg);
+    for (const c of wss.clients) if (c.readyState === 1) c.send(data);
+}
+
+function startTv() {
+    tv = new LGTV({
+        url: `wss://${TV_HOST}:3001`,
+        keyFile: process.env.KEY_FILE || path.join(__dirname, 'tv-key'),
+        reconnect: 3000,
+    });
+    tv.on('connecting', () => console.log(`TV'ye bağlanılıyor: ${TV_HOST}`));
+    tv.on('prompt', () => {
+        console.log('TV ekranındaki bağlantı isteğini kumandayla KABUL ET.');
+        broadcast({ status: 'prompt' });
+    });
+    tv.on('connect', async () => {
+        tvReady = true;
+        console.log('TV bağlandı.');
+        broadcast({ status: 'connected' });
+        tv.subscribe('ssap://audio/getVolume', (err, res) => {
+            if (err || !res) return;
+            const st = res.volumeStatus || res;
+            volume = { level: st.volume, muted: st.muteStatus ?? st.muted };
+            broadcast({ volume });
+        });
+        loadApps().catch((err) => console.log('Uygulama listesi alınamadı:', err.message));
+        try {
+            pointer = await tv.getSocket('ssap://com.webos.service.networkinput/getPointerInputSocket');
+        } catch (err) {
+            console.log('Tuş soketi açılamadı:', err.message);
+        }
+    });
+    tv.on('close', () => {
+        tvReady = false;
+        pointer = null;
+        broadcast({ status: 'disconnected' });
+    });
+    tv.on('error', (err) => console.log('TV hatası:', err.message));
+}
+
+// SSDP ile ağdaki LG webOS TV'yi bul: IP'yi ve uyandırma için MAC adresini döndürür.
+// Bazı TV'ler SSDP'ye her zaman cevap vermiyor, o yüzden mDNS (AirPlay duyurusu) da deneniyor.
+function discoverSsdp(timeout = 3000) {
+    return new Promise((resolve) => {
+        const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+        const found = [];
+        sock.on('message', (data, rinfo) => {
+            const text = data.toString();
+            if (!/webos/i.test(text) || found.some((t) => t.host === rinfo.address)) return;
+            const mac = text.match(/WAKEUP:\s*MAC=([0-9a-f:]{17})/i);
+            found.push({ host: rinfo.address, mac: mac && mac[1] });
+        });
+        sock.on('error', () => resolve(found));
+        sock.bind(() => {
+            for (const st of ['urn:dial-multiscreen-org:service:dial:1', 'urn:lge-com:service:webos-second-screen:1']) {
+                const msg = `M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: "ssdp:discover"\r\nMX: 2\r\nST: ${st}\r\n\r\n`;
+                sock.send(msg, 1900, '239.255.255.250');
+            }
+        });
+        setTimeout(() => { sock.close(); resolve(found); }, timeout);
+    });
+}
+
+function discoverMdns(timeout = 3000) {
+    return new Promise((resolve) => {
+        const mdns = multicastDns();
+        const records = [];
+        mdns.on('response', (res) => records.push(...res.answers, ...res.additionals));
+        mdns.on('error', () => {});
+        mdns.query({ questions: [{ name: '_airplay._tcp.local', type: 'PTR' }] });
+        const lgTargets = () => {
+            const txtLg = new Set(records.filter((r) => r.type === 'TXT' &&
+                [].concat(r.data).some((b) => /manufacturer=LG/i.test(b.toString()))).map((r) => r.name));
+            return records.filter((r) => r.type === 'SRV' && (txtLg.has(r.name) || /webos/i.test(r.name)))
+                .map((r) => r.data.target);
+        };
+        // SRV bulunup A kaydı gelmediyse ayrıca sor.
+        setTimeout(() => {
+            for (const t of lgTargets()) mdns.query({ questions: [{ name: t, type: 'A' }] });
+        }, timeout / 2);
+        setTimeout(() => {
+            const targets = lgTargets();
+            const hosts = [...new Set(records.filter((r) => r.type === 'A' && targets.includes(r.name)).map((r) => r.data))];
+            mdns.destroy();
+            resolve(hosts.map((host) => ({ host, mac: null })));
+        }, timeout);
+    });
+}
+
+// TV ile aynı ağdayken MAC adresi işletim sisteminin ARP tablosunda durur.
+function macFromArp(host) {
+    try {
+        if (fs.existsSync('/proc/net/arp')) {
+            const line = fs.readFileSync('/proc/net/arp', 'utf8').split('\n').find((l) => l.split(/\s+/)[0] === host);
+            const mac = line && line.split(/\s+/)[3];
+            return mac && mac !== '00:00:00:00:00:00' ? mac : null;
+        }
+        const out = require('child_process').execFileSync('arp', ['-n', host], { encoding: 'utf8' });
+        const m = out.match(/ at ([0-9a-f:]+)/i);
+        // macOS baştaki sıfırları atıyor (b → 0b).
+        return m ? m[1].split(':').map((p) => p.padStart(2, '0')).join(':') : null;
+    } catch {
+        return null;
+    }
+}
+
+async function discoverTv() {
+    const ssdp = await discoverSsdp();
+    if (ssdp.length) return ssdp;
+    return discoverMdns();
+}
+
+async function resolveTv() {
+    while (!TV_HOST || !TV_MAC) {
+        const tvs = await discoverTv();
+        const match = TV_HOST ? tvs.find((t) => t.host === TV_HOST) : tvs[0];
+        if (match) {
+            TV_HOST = TV_HOST || match.host;
+            TV_MAC = TV_MAC || match.mac || '';
+            if (tvs.length > 1 && !process.env.TV_HOST && !options.tv_host) {
+                console.log('Birden fazla TV bulundu:', tvs.map((t) => t.host).join(', '), '- ilki kullanılıyor.');
+            }
+            break;
+        }
+        if (TV_HOST) break; // IP verilmiş ama keşifte görünmedi; MAC'i ARP'tan deneriz
+        console.log('TV ağda bulunamadı, 10 sn sonra tekrar denenecek (TV açık mı?)');
+        await new Promise((r) => setTimeout(r, 10000));
+    }
+    if (!TV_MAC) {
+        await fetch(`http://${TV_HOST}:3000`).catch(() => {}); // ARP tablosuna girsin diye TV'ye bir kez dokun
+        TV_MAC = macFromArp(TV_HOST) || '';
+    }
+    console.log(`TV: ${TV_HOST}${TV_MAC ? ` (MAC ${TV_MAC})` : ' (MAC bilinmiyor, Güç ile açma çalışmaz)'}`);
+}
+
+
+async function loadApps() {
+    const list = [];
+    iconUrls.clear();
+    const lp = await tv.request('ssap://com.webos.applicationManager/listLaunchPoints');
+    for (const a of lp.launchPoints || []) {
+        list.push({ id: a.id, title: a.title, kind: 'app' });
+        if (a.icon) iconUrls.set(`app:${a.id}`, a.icon);
+    }
+    const inputs = await tv.request('ssap://tv/getExternalInputList').catch(() => ({}));
+    for (const d of inputs.devices || []) {
+        list.push({ id: d.id, title: d.label || d.id, kind: 'input', connected: d.connected });
+        if (d.icon) iconUrls.set(`input:${d.id}`, d.icon);
+    }
+    apps = list;
+    broadcast({ apps });
+}
+
+// TV ikonları kendinden imzalı HTTPS ile geliyor; telefon açamadığı için sunucu üzerinden veriyoruz.
+function fetchIcon(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, { rejectUnauthorized: false }, (res) => {
+            if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+            const chunks = [];
+            res.on('data', (c) => chunks.push(c));
+            res.on('end', () => resolve({ type: res.headers['content-type'] || 'image/png', body: Buffer.concat(chunks) }));
+        }).on('error', reject);
+    });
+}
+
+function youtubeId(q) {
+    const m = q.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
+    return m && m[1];
+}
+
+async function playYoutube(id) {
+    try {
+        await lounge.play(TV_HOST, id);
+        console.log('Oynat:', id);
+    } catch (err) {
+        console.log('Oynatılamadı:', err.message);
+    }
+}
+
+function req(uri, payload) {
+    return tv.request(uri, payload).catch((err) => console.log(uri, err.message));
+}
+
+async function getPointer() {
+    if (!pointer) {
+        pointer = await tv.getSocket('ssap://com.webos.service.networkinput/getPointerInputSocket');
+    }
+    return pointer;
+}
+
+function wakeOnLan() {
+    if (!TV_MAC || !TV_HOST) return console.log('TV MAC adresi bilinmiyor, açılamıyor.');
+    const mac = Buffer.from(TV_MAC.replace(/[:-]/g, ''), 'hex');
+    const packet = Buffer.concat([Buffer.alloc(6, 0xff), ...Array(16).fill(mac)]);
+    const sock = dgram.createSocket('udp4');
+    sock.bind(() => {
+        sock.setBroadcast(true);
+        const subnet = TV_HOST.replace(/\.\d+$/, '.255');
+        // Hem yayın adresine hem doğrudan TV'ye, 9 ve 7 portlarından gönder.
+        const targets = ['255.255.255.255', subnet, TV_HOST].flatMap((a) => [[a, 9], [a, 7]]);
+        let pending = targets.length;
+        for (const [addr, port] of targets) {
+            sock.send(packet, port, addr, () => { if (--pending === 0) sock.close(); });
+        }
+    });
+}
+
+async function togglePower() {
+    // Ekran açıksa kapat; bağlantı yoksa ya da TV beklemedeyse Wake-on-LAN ile aç.
+    if (tvReady && tv) {
+        const state = await tv.request('ssap://com.webos.service.tvpower/power/getPowerState').catch(() => null);
+        if (!state || state.state === 'Active') {
+            console.log('TV kapatılıyor');
+            await req('ssap://system/turnOff');
+            return;
+        }
+    }
+    console.log('TV açılıyor (Wake-on-LAN)');
+    wakeOnLan();
+}
+
+// Telefondan gelen komutlar sırayla işlenir ki harfler karışmasın.
+let queue = Promise.resolve();
+function handle(msg) {
+    queue = queue.then(async () => {
+        if (msg.type === 'power') return togglePower();
+        if (!tvReady) return;
+        switch (msg.type) {
+            case 'edit':
+                if (msg.del > 0) await req('ssap://com.webos.service.ime/deleteCharacters', { count: msg.del });
+                if (msg.ins) await req('ssap://com.webos.service.ime/insertText', { text: msg.ins, replace: 0 });
+                break;
+            case 'play':
+                // YouTube kendi ekran klavyesini kullandığı için arama Mac'te yapılıyor, TV'ye sadece video gidiyor.
+                // Telefondaki YouTube'un "TV'de oynat" yolu (Lounge API); webOS launch YouTube açıkken videoyu yok sayıyor.
+                await playYoutube(msg.id);
+                break;
+            case 'open': {
+                // Adres gibi görünüyorsa doğrudan aç, değilse Yandex'te ara.
+                const q = msg.q.trim();
+                const yt = youtubeId(q);
+                if (yt) {
+                    await playYoutube(yt); // YouTube linkini tarayıcı yerine YouTube uygulamasında aç
+                    break;
+                }
+                const url = /^https?:\/\//i.test(q) ? q
+                    : /^[^\s]+\.[^\s]{2,}$/.test(q) ? `https://${q}`
+                    : `https://yandex.com.tr/search/?text=${encodeURIComponent(q)}`;
+                console.log('Tarayıcıda aç:', url);
+                await req('ssap://system.launcher/open', { target: url });
+                break;
+            }
+            case 'enter':
+                await req('ssap://com.webos.service.ime/sendEnterKey');
+                break;
+            case 'launch':
+                await req('ssap://system.launcher/launch', { id: msg.id });
+                break;
+            case 'input':
+                await req('ssap://tv/switchInput', { inputId: msg.id });
+                break;
+            case 'pointer':
+                try {
+                    const p = await getPointer();
+                    if (msg.kind === 'move') p.send('move', { dx: msg.dx, dy: msg.dy, down: 0 });
+                    else if (msg.kind === 'scroll') p.send('scroll', { dx: msg.dx, dy: msg.dy });
+                    else if (msg.kind === 'click') p.send('click');
+                } catch (err) {
+                    pointer = null;
+                }
+                break;
+            case 'button':
+                try {
+                    (await getPointer()).send('button', { name: msg.name });
+                } catch (err) {
+                    pointer = null;
+                    console.log('Tuş gönderilemedi:', err.message);
+                }
+                break;
+        }
+    });
+}
+
+const page = fs.readFileSync(path.join(__dirname, 'index.html'));
+async function youtubeSearch(q) {
+    const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&hl=tr&gl=TR`, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
+            'Accept-Language': 'tr',
+            Cookie: 'SOCS=CAI',
+        },
+    });
+    const m = (await r.text()).match(/var ytInitialData = (\{.*?\});<\/script>/s);
+    const out = [];
+    (function walk(o) {
+        if (!o || typeof o !== 'object') return;
+        if (o.videoRenderer) {
+            const v = o.videoRenderer;
+            out.push({
+                id: v.videoId,
+                title: v.title?.runs?.[0]?.text,
+                channel: v.ownerText?.runs?.[0]?.text,
+                duration: v.lengthText?.simpleText || 'canlı',
+                thumb: `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`,
+            });
+            return;
+        }
+        for (const k in o) walk(o[k]);
+    })(m && JSON.parse(m[1]));
+    return out;
+}
+
+const server = http.createServer(async (req, res) => {
+    const url = new URL(req.url, 'http://x');
+    if (url.pathname === '/icon') {
+        const key = url.searchParams.get('k');
+        try {
+            if (!iconCache.has(key)) {
+                if (!iconUrls.has(key)) throw new Error('yok');
+                iconCache.set(key, await fetchIcon(iconUrls.get(key)));
+            }
+            const icon = iconCache.get(key);
+            res.writeHead(200, { 'Content-Type': icon.type, 'Cache-Control': 'max-age=86400' });
+            res.end(icon.body);
+        } catch {
+            res.writeHead(404);
+            res.end();
+        }
+        return;
+    }
+    if (url.pathname === '/yt') {
+        try {
+            const results = await youtubeSearch(url.searchParams.get('q') || '');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(results));
+        } catch (err) {
+            res.writeHead(500);
+            res.end(err.message);
+        }
+        return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(page);
+});
+
+const wss = new WebSocketServer({ server });
+wss.on('connection', (ws) => {
+    ws.send(JSON.stringify({ status: tvReady ? 'connected' : 'disconnected', volume, apps }));
+    ws.on('message', (data) => {
+        try {
+            handle(JSON.parse(data));
+        } catch {}
+    });
+});
+
+server.listen(PORT, () => {
+    // Docker köprüleri (172.x) yerine yerel ağ adresini seç.
+    const ips = Object.values(os.networkInterfaces()).flat()
+        .filter((i) => i.family === 'IPv4' && !i.internal && !i.address.startsWith('172.'))
+        .map((i) => i.address);
+    const ip = process.env.HOST_IP || ips[0];
+    const suffix = PORT === 80 ? '' : `:${PORT}`;
+    console.log('Telefondan şu adresi aç:');
+    console.log(`  http://${HOSTNAME}${suffix}`);
+    if (ip) console.log(`  http://${ip}${suffix}`);
+
+    // kumanda.local adını mDNS ile ağa duyur; macOS'ta da Linux'ta da çalışır.
+    if (ip) {
+        const mdns = multicastDns();
+        mdns.on('query', (query) => {
+            const asked = query.questions.some((q) =>
+                q.name.toLowerCase() === HOSTNAME && (q.type === 'A' || q.type === 'ANY'));
+            if (asked) mdns.respond({ answers: [{ name: HOSTNAME, type: 'A', ttl: 120, flush: true, data: ip }] });
+        });
+        mdns.on('error', (err) => console.log('mDNS hatası:', err.message));
+    }
+});
+
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
+
+resolveTv().then(startTv);
