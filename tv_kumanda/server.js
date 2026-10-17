@@ -25,6 +25,13 @@ let TV_HOST = process.argv[2] || process.env.TV_HOST || options.tv_host || '';
 let TV_MAC = process.env.TV_MAC || options.tv_mac || '';
 const PORT = Number(process.env.PORT || options.port) || 80;
 const HOSTNAME = process.env.MDNS_NAME || options.hostname || 'kumanda.local';
+const SEARCH_ENGINES = {
+    yandex: { name: 'Yandex', url: 'https://yandex.com.tr/search/?text=' },
+    google: { name: 'Google', url: 'https://www.google.com/search?q=' },
+    duckduckgo: { name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=' },
+    bing: { name: 'Bing', url: 'https://www.bing.com/search?q=' },
+};
+const SEARCH = SEARCH_ENGINES[process.env.SEARCH_ENGINE || options.search_engine] || SEARCH_ENGINES.yandex;
 
 let tv = null;
 
@@ -274,7 +281,7 @@ function handle(msg) {
                 await playYoutube(msg.id);
                 break;
             case 'open': {
-                // Open it directly if it looks like an address, otherwise search on Yandex.
+                // Open it directly if it looks like an address, otherwise search with the configured engine.
                 const q = msg.q.trim();
                 const yt = youtubeId(q);
                 if (yt) {
@@ -283,7 +290,7 @@ function handle(msg) {
                 }
                 const url = /^https?:\/\//i.test(q) ? q
                     : /^[^\s]+\.[^\s]{2,}$/.test(q) ? `https://${q}`
-                    : `https://yandex.com.tr/search/?text=${encodeURIComponent(q)}`;
+                    : SEARCH.url + encodeURIComponent(q);
                 console.log('Open in browser:', url);
                 await req('ssap://system.launcher/open', { target: url });
                 break;
@@ -320,11 +327,11 @@ function handle(msg) {
 }
 
 const page = fs.readFileSync(path.join(__dirname, 'index.html'));
-async function youtubeSearch(q) {
-    const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&hl=tr&gl=TR`, {
+async function youtubeSearch(q, hl = 'en') {
+    const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&hl=${encodeURIComponent(hl)}`, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
-            'Accept-Language': 'tr',
+            'Accept-Language': hl,
             Cookie: 'SOCS=CAI',
         },
     });
@@ -338,7 +345,7 @@ async function youtubeSearch(q) {
                 id: v.videoId,
                 title: v.title?.runs?.[0]?.text,
                 channel: v.ownerText?.runs?.[0]?.text,
-                duration: v.lengthText?.simpleText || 'canlı',
+                duration: v.lengthText?.simpleText || null, // null = live stream
                 thumb: `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`,
             });
             return;
@@ -368,7 +375,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/yt') {
         try {
-            const results = await youtubeSearch(url.searchParams.get('q') || '');
+            const results = await youtubeSearch(url.searchParams.get('q') || '', url.searchParams.get('hl') || 'en');
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(results));
         } catch (err) {
@@ -383,7 +390,7 @@ const server = http.createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ server });
 wss.on('connection', (ws) => {
-    ws.send(JSON.stringify({ status: tvReady ? 'connected' : 'disconnected', volume, apps }));
+    ws.send(JSON.stringify({ status: tvReady ? 'connected' : 'disconnected', volume, apps, searchEngine: SEARCH.name }));
     ws.on('message', (data) => {
         try {
             handle(JSON.parse(data));

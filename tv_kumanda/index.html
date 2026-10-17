@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#111">
-<title>TV Kumanda</title>
+<title data-i18n="title">TV Kumanda</title>
 <style>
   :root { --bg:#111; --fg:#eee; --muted:#888; --btn:#232323; --btn-active:#3a3a3a; --accent:#c8102e; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -37,6 +37,7 @@
   .bar button { padding:12px 0; font-size:17px; }
   #mute.muted { background:#3a3214; color:#fc3; }
   .meta { display:flex; align-items:center; gap:12px; }
+  #lang { padding:4px 8px; font-size:12px; border-radius:8px; color:var(--muted); }
   #volume { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
   #power { background:#3a1414; color:#ff6b6b; }
   #ytForm, #webForm { display:flex; gap:8px; }
@@ -62,35 +63,36 @@
 </head>
 <body>
 <header>
-  <h1>TV Kumanda</h1>
+  <h1 data-i18n="title">TV Kumanda</h1>
   <div class="meta">
     <span id="volume"></span>
-    <span id="status">bağlanıyor…</span>
+    <span id="status"></span>
+    <button id="lang" aria-label="Language"></button>
   </div>
 </header>
 
 <div class="bar">
-  <button data-btn="VOLUMEDOWN" aria-label="Sesi kıs">🔉 −</button>
-  <button id="mute" data-btn="MUTE" aria-label="Sessiz">🔇</button>
-  <button data-btn="VOLUMEUP" aria-label="Sesi aç">🔊 +</button>
-  <button id="power" aria-label="TV'yi aç/kapat">⏻ Güç</button>
+  <button data-btn="VOLUMEDOWN" data-i18n-aria="volDown">🔉 −</button>
+  <button id="mute" data-btn="MUTE" data-i18n-aria="mute">🔇</button>
+  <button data-btn="VOLUMEUP" data-i18n-aria="volUp">🔊 +</button>
+  <button id="power" data-i18n-aria="powerAria" data-i18n="power"></button>
 </div>
 
 <div class="tabs">
-  <button id="tabKb" class="on">⌨ Kumanda</button>
+  <button id="tabKb" class="on" data-i18n="tabRemote"></button>
   <button id="tabYt">▶ YouTube</button>
   <button id="tabWeb">🌐 Web</button>
-  <button id="tabApps">▦ Uygulama</button>
+  <button id="tabApps" data-i18n="tabApps"></button>
 </div>
 
 <section id="kbView">
   <input id="text" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"
-         placeholder="Buraya yaz, TV'de görünsün" enterkeyhint="send">
-  <div class="hint">TV'de önce bir arama kutusu seç, ekran klavyesi açılsın. Sonra buraya yaz.</div>
+         data-i18n-ph="typeHere" enterkeyhint="send">
+  <div class="hint" data-i18n="typeHint"></div>
 
   <div class="row">
-    <button data-act="back1">⌫ Sil</button>
-    <button data-act="clear">Temizle</button>
+    <button data-act="back1" data-i18n="delete"></button>
+    <button data-act="clear" data-i18n="clear"></button>
     <button data-act="enter" class="primary">Enter ⏎</button>
   </div>
 
@@ -100,68 +102,120 @@
     <span></span><button data-btn="DOWN">▼</button><span></span>
   </div>
   <div class="row">
-    <button data-btn="BACK">↩ Geri</button>
-    <button data-btn="HOME">⌂ Ana</button>
-    <button data-btn="MENU">⚙ Ayar</button>
+    <button data-btn="BACK" data-i18n="back"></button>
+    <button data-btn="HOME" data-i18n="home"></button>
+    <button data-btn="MENU" data-i18n="settings"></button>
   </div>
   <div class="row four">
-    <button data-btn="REWIND" aria-label="Geri sar">⏪</button>
-    <button data-btn="PLAY" aria-label="Oynat">▶</button>
-    <button data-btn="PAUSE" aria-label="Duraklat">⏸</button>
-    <button data-btn="FASTFORWARD" aria-label="İleri sar">⏩</button>
+    <button data-btn="REWIND" data-i18n-aria="rewind">⏪</button>
+    <button data-btn="PLAY" data-i18n-aria="play">▶</button>
+    <button data-btn="PAUSE" data-i18n-aria="pause">⏸</button>
+    <button data-btn="FASTFORWARD" data-i18n-aria="forward">⏩</button>
   </div>
 </section>
 
 <section id="ytView" class="hidden">
   <form id="ytForm">
-    <input id="ytQ" class="field" type="search" placeholder="YouTube'da ara" enterkeyhint="search" autocomplete="off">
-    <button class="primary">Ara</button>
+    <input id="ytQ" class="field" type="search" data-i18n-ph="ytSearch" enterkeyhint="search" autocomplete="off">
+    <button class="primary" data-i18n="search"></button>
   </form>
   <div id="ytResults"></div>
 </section>
 
 <section id="webView" class="hidden">
   <form id="webForm">
-    <input id="webQ" class="field" type="text" inputmode="url" placeholder="Adres, arama ya da YouTube linki" enterkeyhint="go"
+    <input id="webQ" class="field" type="text" inputmode="url" data-i18n-ph="webPh" enterkeyhint="go"
            autocomplete="off" autocapitalize="none" spellcheck="false">
-    <button class="primary">Aç</button>
+    <button class="primary" data-i18n="open"></button>
   </form>
-  <div class="hint">Adres yazarsan TV tarayıcısında açılır, başka bir şey yazarsan Yandex'te aranır. YouTube linki YouTube uygulamasında açılır.</div>
+  <div class="hint" data-i18n="webHint"></div>
   <div id="webStatus" class="hint"></div>
-  <div id="touchpad">Touchpad<br>Sürükle: imleç · Dokun: tıkla<br>İki parmak: kaydır</div>
+  <div id="touchpad" data-i18n-html="touchpad"></div>
   <div class="row">
-    <button data-btn="BACK">↩ Geri</button>
-    <button data-btn="HOME">⌂ Ana</button>
+    <button data-btn="BACK" data-i18n="back"></button>
+    <button data-btn="HOME" data-i18n="home"></button>
     <button data-btn="ENTER">OK</button>
   </div>
 </section>
 
 <section id="appsView" class="hidden">
-  <div id="appsEmpty" class="hint">TV bağlanınca uygulamalar burada görünür.</div>
-  <h2 id="inputsTitle" class="hidden">Girişler</h2>
+  <div id="appsEmpty" class="hint" data-i18n="appsEmpty"></div>
+  <h2 id="inputsTitle" class="hidden" data-i18n="inputs"></h2>
   <div id="inputList" class="apps"></div>
-  <h2 id="appsTitle" class="hidden">Uygulamalar</h2>
+  <h2 id="appsTitle" class="hidden" data-i18n="apps"></h2>
   <div id="appList" class="apps"></div>
 </section>
 
 <script>
+  const STRINGS = {
+    tr: {
+      title: 'TV Kumanda', connected: 'TV bağlı', prompt: "TV'de isteği onayla", disconnected: 'TV bağlı değil',
+      offline: 'sunucu yok', connecting: 'bağlanıyor…', muted: 'Sessiz',
+      volDown: 'Sesi kıs', mute: 'Sessiz', volUp: 'Sesi aç', power: '⏻ Güç', powerAria: "TV'yi aç/kapat",
+      tabRemote: '⌨ Kumanda', tabApps: '▦ Uygulama',
+      typeHere: "Buraya yaz, TV'de görünsün",
+      typeHint: "TV'de önce bir arama kutusu seç, ekran klavyesi açılsın. Sonra buraya yaz.",
+      delete: '⌫ Sil', clear: 'Temizle', back: '↩ Geri', home: '⌂ Ana', settings: '⚙ Ayar',
+      rewind: 'Geri sar', play: 'Oynat', pause: 'Duraklat', forward: 'İleri sar',
+      ytSearch: "YouTube'da ara", search: 'Ara', searching: 'Aranıyor…', noResults: 'Sonuç yok.',
+      searchFailed: 'Arama başarısız.', live: 'canlı',
+      webPh: 'Adres, arama ya da YouTube linki', open: 'Aç', opening: "TV'de açılıyor: {q}",
+      webHint: "Adres yazarsan TV tarayıcısında açılır, başka bir şey yazarsan {engine}'te aranır. YouTube linki YouTube uygulamasında açılır.",
+      touchpad: 'Touchpad<br>Sürükle: imleç · Dokun: tıkla<br>İki parmak: kaydır',
+      appsEmpty: 'TV bağlanınca uygulamalar burada görünür.', inputs: 'Girişler', apps: 'Uygulamalar',
+    },
+    en: {
+      title: 'TV Remote', connected: 'TV connected', prompt: 'Accept the request on the TV', disconnected: 'TV not connected',
+      offline: 'server offline', connecting: 'connecting…', muted: 'Muted',
+      volDown: 'Volume down', mute: 'Mute', volUp: 'Volume up', power: '⏻ Power', powerAria: 'Turn TV on/off',
+      tabRemote: '⌨ Remote', tabApps: '▦ Apps',
+      typeHere: 'Type here to send to the TV',
+      typeHint: 'First select a text field on the TV so its on-screen keyboard opens, then type here.',
+      delete: '⌫ Delete', clear: 'Clear', back: '↩ Back', home: '⌂ Home', settings: '⚙ Settings',
+      rewind: 'Rewind', play: 'Play', pause: 'Pause', forward: 'Fast forward',
+      ytSearch: 'Search YouTube', search: 'Search', searching: 'Searching…', noResults: 'No results.',
+      searchFailed: 'Search failed.', live: 'live',
+      webPh: 'Address, search or YouTube link', open: 'Open', opening: 'Opening on TV: {q}',
+      webHint: 'Addresses open in the TV browser; anything else is searched on {engine}. YouTube links open in the YouTube app.',
+      touchpad: 'Touchpad<br>Drag: move cursor · Tap: click<br>Two fingers: scroll',
+      appsEmpty: 'Apps appear here once the TV is connected.', inputs: 'Inputs', apps: 'Apps',
+    },
+  };
+
+  // Start in the phone's language; the header button switches it and the choice is remembered.
+  let lang = (navigator.language || '').toLowerCase().startsWith('tr') ? 'tr' : 'en';
+  try { const saved = localStorage.getItem('lang'); if (STRINGS[saved]) lang = saved; } catch {}
+  let engine = 'Yandex', statusKey = 'connecting', volumeState = null;
+  const t = (key, vars = {}) => STRINGS[lang][key].replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n, { engine }); });
+    document.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
+    document.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
+    document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
+    document.getElementById('lang').textContent = lang === 'tr' ? 'EN' : 'TR';
+    setStatus(statusKey);
+    setVolume(volumeState);
+  }
+
   const input = document.getElementById('text');
   const statusEl = document.getElementById('status');
   let ws, last = '';
 
   function setStatus(s) {
-    const map = { connected: ['TV bağlı', 'ok'], prompt: ["TV'de isteği onayla", 'warn'],
-                  disconnected: ['TV bağlı değil', ''], offline: ['sunucu yok', ''] };
-    const [label, cls] = map[s] || [s, ''];
-    statusEl.textContent = label;
-    statusEl.className = cls;
+    statusKey = s;
+    const cls = { connected: 'ok', prompt: 'warn' };
+    statusEl.textContent = STRINGS[lang][s] ? t(s) : s;
+    statusEl.className = cls[s] || '';
   }
 
   function setVolume(v) {
+    volumeState = v;
     // The mute button only shows mute state; the level is shown separately in the header.
     mute.classList.toggle('muted', !!(v && v.muted));
     mute.setAttribute('aria-pressed', v && v.muted ? 'true' : 'false');
-    volume.textContent = !v ? '' : v.muted ? '🔇 Sessiz' : `🔊 ${v.level}`;
+    volume.textContent = !v ? '' : v.muted ? `🔇 ${t('muted')}` : `🔊 ${v.level}`;
   }
 
   function renderApps(list) {
@@ -192,10 +246,18 @@
       if (m.status) setStatus(m.status);
       if ('volume' in m) setVolume(m.volume);
       if (m.apps) renderApps(m.apps);
+      if (m.searchEngine) { engine = m.searchEngine; applyLang(); }
     };
     ws.onclose = () => { setStatus('offline'); setTimeout(connect, 1500); };
   }
+  applyLang();
   connect();
+
+  document.getElementById('lang').onclick = () => {
+    lang = lang === 'tr' ? 'en' : 'tr';
+    try { localStorage.setItem('lang', lang); } catch {}
+    applyLang();
+  };
 
   function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 
@@ -253,7 +315,7 @@
     const q = webQ.value.trim();
     if (!q) return;
     send({ type: 'open', q });
-    webStatus.textContent = `TV'de açılıyor: ${q}`;
+    webStatus.textContent = t('opening', { q });
     webQ.value = '';
     webQ.blur();
   });
@@ -263,21 +325,21 @@
     const q = ytQ.value.trim();
     if (!q) return;
     ytQ.blur();
-    ytResults.textContent = 'Aranıyor…';
+    ytResults.textContent = t('searching');
     try {
-      const list = await (await fetch('/yt?q=' + encodeURIComponent(q))).json();
-      ytResults.textContent = list.length ? '' : 'Sonuç yok.';
+      const list = await (await fetch(`/yt?q=${encodeURIComponent(q)}&hl=${lang}`)).json();
+      ytResults.textContent = list.length ? '' : t('noResults');
       for (const v of list) {
         const b = document.createElement('button');
         b.className = 'vid';
         b.innerHTML = '<img loading="lazy"><div><b></b><small></small></div>';
         b.querySelector('img').src = v.thumb;
         b.querySelector('b').textContent = v.title;
-        b.querySelector('small').textContent = `${v.channel || ''} · ${v.duration}`;
+        b.querySelector('small').textContent = `${v.channel || ''} · ${v.duration || t('live')}`;
         b.onclick = () => send({ type: 'play', id: v.id });
         ytResults.append(b);
       }
-    } catch { ytResults.textContent = 'Arama başarısız.'; }
+    } catch { ytResults.textContent = t('searchFailed'); }
   });
 
   // Touchpad: one finger moves the cursor, a short tap clicks, two fingers scroll.

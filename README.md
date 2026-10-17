@@ -2,16 +2,17 @@
 
 A small local server that lets you control an LG webOS TV from your phone's browser. No app to install: on the same Wi-Fi, just open **http://kumanda.local** on your phone.
 
-Built and tested with an LG C4 (OLED55C46LA, webOS 24). It should work on other webOS TVs as well. The phone interface is in Turkish.
+Built and tested with an LG C4 (OLED55C46LA, webOS 24). It should work on other webOS TVs as well.
 
 ## Features
 
 - **Keyboard**: Text you type on the phone goes straight into the TV's text field. Deletes, Enter and autocorrect are kept in sync.
 - **YouTube**: Search on your phone and tap a result to play it in the TV's YouTube app. YouTube draws its own on-screen keyboard, so typing text doesn't reach it; this tab fills that gap.
-- **Web**: Type an address to open it in the TV browser, or anything else to search on Yandex. Paste a YouTube link and it opens in the YouTube app. A **touchpad** controls the browser cursor: drag to move, tap to click, two fingers to scroll.
+- **Web**: Type an address to open it in the TV browser, or anything else to search the web (Yandex by default, configurable). Paste a YouTube link and it opens in the YouTube app. A **touchpad** controls the browser cursor: drag to move, tap to click, two fingers to scroll.
 - **Apps**: Every app and HDMI input on the TV, with icons. Tap to open.
 - **Remote**: Arrow keys, OK, Back, Home, Settings and media keys (⏪ ▶ ⏸ ⏩).
 - **Volume and power**: Volume up/down, mute and a live volume level. The power button turns the TV off, or wakes it with Wake-on-LAN when it's off.
+- **English and Turkish**: The interface follows your phone's language. Switch it with the TR/EN button in the header; the choice is remembered.
 
 The TV's IP and MAC address are discovered automatically: SSDP first, then mDNS (the TV's AirPlay advertisement), with the MAC address read from the ARP table.
 
@@ -39,6 +40,7 @@ Options on the add-on's **Configuration** tab:
 | `tv_mac` | The TV's MAC address for Wake-on-LAN. Leave empty for auto-discovery. |
 | `hostname` | Name announced on the network. Defaults to `kumanda.local`. |
 | `port` | Web server port. Defaults to `80`. |
+| `search_engine` | Engine used for web searches: `yandex` (default), `google`, `duckduckgo` or `bing`. |
 
 ### On a computer (macOS, Linux, Raspberry Pi)
 
@@ -56,7 +58,7 @@ Port 80 works out of the box on macOS but needs privileges on Linux. Pick anothe
 PORT=8080 npm start
 ```
 
-Environment variables: `TV_HOST`, `TV_MAC`, `PORT`, `MDNS_NAME`, `KEY_FILE`. You can also pass the TV's IP as an argument: `node server.js 192.168.1.50`.
+Environment variables: `TV_HOST`, `TV_MAC`, `PORT`, `MDNS_NAME`, `KEY_FILE`, `SEARCH_ENGINE`. You can also pass the TV's IP as an argument: `node server.js 192.168.1.50`.
 
 ## How it works
 
