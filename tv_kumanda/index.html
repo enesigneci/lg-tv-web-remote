@@ -158,7 +158,7 @@
   }
 
   function setVolume(v) {
-    // Mute tuşu sadece sessiz durumunu gösterir; seviye başlıkta ayrı durur.
+    // The mute button only shows mute state; the level is shown separately in the header.
     mute.classList.toggle('muted', !!(v && v.muted));
     mute.setAttribute('aria-pressed', v && v.muted ? 'true' : 'false');
     volume.textContent = !v ? '' : v.muted ? '🔇 Sessiz' : `🔊 ${v.level}`;
@@ -199,7 +199,7 @@
 
   function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 
-  // Kutudaki metnin önceki hâline göre farkı bul: ortak baştan sonrasını sil, yenisini yaz.
+  // Diff against the previous value: delete everything after the common prefix, then type the rest.
   function sync() {
     const now = input.value;
     let i = 0;
@@ -280,8 +280,8 @@
     } catch { ytResults.textContent = 'Arama başarısız.'; }
   });
 
-  // Touchpad: tek parmak imleci taşır, kısa dokunuş tıklar, iki parmak kaydırır.
-  // Hareketler biriktirilip kare başına bir kez gönderilir ki sunucu boğulmasın.
+  // Touchpad: one finger moves the cursor, a short tap clicks, two fingers scroll.
+  // Movement is accumulated and sent once per frame so the server isn't flooded.
   const SPEED = 1.6;
   let touch = null, acc = { dx: 0, dy: 0, sx: 0, sy: 0 }, frame = 0;
   function flush() {

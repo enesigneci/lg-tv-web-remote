@@ -1,48 +1,48 @@
-# LG TV Kumanda
+# LG TV Web Remote
 
-Telefonun tarayıcısından LG webOS TV'yi kontrol etmeni sağlayan küçük bir yerel sunucu. Uygulama kurmaya gerek yok: aynı Wi-Fi'deyken telefondan **http://kumanda.local** adresini açman yeterli.
+A small local server that lets you control an LG webOS TV from your phone's browser. No app to install: on the same Wi-Fi, just open **http://kumanda.local** on your phone.
 
-LG C4 (OLED55C46LA, webOS 24) ile geliştirildi ve test edildi. Diğer webOS TV'lerde de çalışması beklenir.
+Built and tested with an LG C4 (OLED55C46LA, webOS 24). It should work on other webOS TVs as well. The phone interface is in Turkish.
 
-## Özellikler
+## Features
 
-- **Klavye**: Telefonda yazdığın metin TV'deki yazı alanına anında gider. Silme, Enter ve otomatik düzeltme de eşitlenir.
-- **YouTube**: Arama telefonda yapılır, dokunduğun video TV'deki YouTube uygulamasında açılır. YouTube kendi ekran klavyesini kullandığı için yazı göndermek orada işe yaramaz, bu sekme o eksiği kapatır.
-- **Web**: Adres yazarsan TV tarayıcısında açılır, başka bir şey yazarsan Yandex'te aranır. YouTube linki yapıştırırsan video YouTube uygulamasında açılır. Tarayıcıda imleci yönetmek için bir **touchpad** de var: sürüklemek imleci taşır, dokunmak tıklar, iki parmakla sayfa kaydırılır.
-- **Uygulamalar**: TV'deki tüm uygulamalar ve HDMI girişleri ikonlarıyla listelenir, dokununca açılır.
-- **Kumanda**: Yön tuşları, OK, Geri, Ana ekran, Ayarlar ve medya tuşları (⏪ ▶ ⏸ ⏩).
-- **Ses ve güç**: Sesi açıp kısma, sessize alma ve anlık ses seviyesi. Güç tuşu TV'yi kapatır, kapalıysa Wake-on-LAN ile açar.
+- **Keyboard**: Text you type on the phone goes straight into the TV's text field. Deletes, Enter and autocorrect are kept in sync.
+- **YouTube**: Search on your phone and tap a result to play it in the TV's YouTube app. YouTube draws its own on-screen keyboard, so typing text doesn't reach it; this tab fills that gap.
+- **Web**: Type an address to open it in the TV browser, or anything else to search on Yandex. Paste a YouTube link and it opens in the YouTube app. A **touchpad** controls the browser cursor: drag to move, tap to click, two fingers to scroll.
+- **Apps**: Every app and HDMI input on the TV, with icons. Tap to open.
+- **Remote**: Arrow keys, OK, Back, Home, Settings and media keys (⏪ ▶ ⏸ ⏩).
+- **Volume and power**: Volume up/down, mute and a live volume level. The power button turns the TV off, or wakes it with Wake-on-LAN when it's off.
 
-TV'nin IP ve MAC adresi ağda otomatik bulunur. Bunun için önce SSDP, olmazsa mDNS (AirPlay duyurusu) deneniyor, MAC adresi de ARP tablosundan okunuyor.
+The TV's IP and MAC address are discovered automatically: SSDP first, then mDNS (the TV's AirPlay advertisement), with the MAC address read from the ARP table.
 
-## TV'de yapılacak ayarlar
+## TV settings
 
-1. **Ayarlar → Genel → Cihazlar → Harici Cihazlar → Mobil ile TV'yi Aç → Wi-Fi ile aç** seçeneğini aç. Bu ayar olmadan Güç tuşu TV'yi kapatabilir ama tekrar açamaz.
-2. Sunucu ilk kez bağlandığında TV ekranında bir bağlantı isteği çıkar, kumandayla **Kabul Et**'e bas. Eşleşme anahtarı kaydedildiği için bunu bir kez yapman yeterli.
+1. Turn on **Settings → General → Devices → External Devices → TV On With Mobile → Turn on via Wi-Fi**. Without it, the power button can turn the TV off but not back on.
+2. The first time the server connects, the TV shows a connection request. Press **Accept** on the remote. The pairing key is saved, so you only do this once.
 
-## Kurulum
+## Installation
 
-### Home Assistant eklentisi olarak (önerilen)
+### As a Home Assistant add-on (recommended)
 
-Sunucu Home Assistant'la birlikte sürekli açık kalır ve açılışta kendiliğinden başlar.
+The server runs alongside Home Assistant and starts automatically on boot.
 
-1. Home Assistant'ta **Ayarlar → Eklentiler → Eklenti Mağazası → ⋮ → Depolar** menüsüne gir.
-2. `https://github.com/enesigneci/lg-tv-web-remote` adresini ekle.
-3. **TV Kumanda** eklentisini kur ve başlat.
-4. Telefondan **http://kumanda.local** adresini aç. Bu ad çözülmezse Home Assistant'ın IP adresini kullan.
+1. In Home Assistant, go to **Settings → Add-ons → Add-on Store → ⋮ → Repositories**.
+2. Add `https://github.com/enesigneci/lg-tv-web-remote`.
+3. Install and start the **LG TV Web Remote** add-on.
+4. Open **http://kumanda.local** on your phone. If the name doesn't resolve, use your Home Assistant IP address.
 
-Eklentinin **Yapılandırma** sekmesindeki ayarlar:
+Options on the add-on's **Configuration** tab:
 
-| Ayar | Açıklama |
+| Option | Description |
 | --- | --- |
-| `tv_host` | TV'nin IP adresi. Boş bırakırsan otomatik bulunur. |
-| `tv_mac` | Wake-on-LAN için TV'nin MAC adresi. Boş bırakırsan otomatik bulunur. |
-| `hostname` | Ağa duyurulan ad. Varsayılanı `kumanda.local`. |
-| `port` | Web sunucusunun portu. Varsayılanı `80`. |
+| `tv_host` | The TV's IP address. Leave empty for auto-discovery. |
+| `tv_mac` | The TV's MAC address for Wake-on-LAN. Leave empty for auto-discovery. |
+| `hostname` | Name announced on the network. Defaults to `kumanda.local`. |
+| `port` | Web server port. Defaults to `80`. |
 
-### Bilgisayarda (macOS, Linux, Raspberry Pi)
+### On a computer (macOS, Linux, Raspberry Pi)
 
-Node.js 18 veya üstü gerekiyor.
+Requires Node.js 18 or newer.
 
 ```bash
 cd tv_kumanda
@@ -50,24 +50,24 @@ npm install
 npm start
 ```
 
-80 portunu kullanmak macOS'ta sorun çıkarmaz, Linux'ta yetki ister. Linux'ta başka bir port seçebilirsin:
+Port 80 works out of the box on macOS but needs privileges on Linux. Pick another port there:
 
 ```bash
 PORT=8080 npm start
 ```
 
-Ortam değişkenleri: `TV_HOST`, `TV_MAC`, `PORT`, `MDNS_NAME`, `KEY_FILE`. TV'nin IP'sini komut satırı argümanı olarak da verebilirsin: `node server.js 192.168.1.50`.
+Environment variables: `TV_HOST`, `TV_MAC`, `PORT`, `MDNS_NAME`, `KEY_FILE`. You can also pass the TV's IP as an argument: `node server.js 192.168.1.50`.
 
-## Nasıl çalışıyor
+## How it works
 
-- TV ile **webOS SSAP** protokolü üzerinden konuşuluyor (`wss://TV:3001`). Bu iş için [lgtv2](https://github.com/hobbyquaker/lgtv2) kütüphanesi kullanılıyor. Yazı göndermek için `com.webos.service.ime`, tuşlar ve touchpad için ağ giriş soketi kullanılıyor.
-- YouTube videoları, telefondaki YouTube uygulamasının "TV'de oynat" özelliğinin kullandığı **YouTube Lounge API** ile gönderiliyor. TV'nin ekran kimliği DIAL üzerinden alınıyor.
-- `kumanda.local` adı, sunucunun içinde çalışan bir mDNS yanıtlayıcısıyla duyuruluyor. Bu yüzden bilgisayarın ya da Home Assistant'ın adını değiştirmek gerekmiyor.
+- The server talks to the TV over the **webOS SSAP** protocol (`wss://TV:3001`) using the [lgtv2](https://github.com/hobbyquaker/lgtv2) library. Text goes through `com.webos.service.ime`; keys and the touchpad use the network input socket.
+- YouTube videos are sent with the **YouTube Lounge API**, the same mechanism the YouTube phone app uses for "Play on TV". The TV's screen ID comes from DIAL.
+- The `kumanda.local` name is announced by an mDNS responder running inside the server, so there's no need to rename your computer or Home Assistant host.
 
-## Güvenlik
+## Security
 
-`tv-key` dosyası TV'yi kontrol etme yetkisi veren eşleşme anahtarıdır. `.gitignore` dosyasında listeli, onu paylaşma. Sunucuda kimlik doğrulama yok: ev ağındaki herkes kumandayı kullanabilir. Sunucuyu internete açma.
+The `tv-key` file is the pairing key that grants control of your TV. It's listed in `.gitignore`; don't share it. The server has no authentication: anyone on your home network can use the remote. Don't expose it to the internet.
 
-## Lisans
+## License
 
 MIT

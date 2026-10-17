@@ -1,7 +1,7 @@
 {
   "name": "lg-tv-web-remote",
-  "version": "1.3.1",
-  "description": "Telefondan LG webOS TV kumandası: klavye, YouTube, tarayıcı, uygulamalar, ses ve güç",
+  "version": "1.3.2",
+  "description": "Control an LG webOS TV from your phone's browser: keyboard, YouTube, browser, apps, volume and power",
   "private": true,
   "license": "MIT",
   "main": "server.js",

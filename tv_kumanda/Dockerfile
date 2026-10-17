@@ -8,6 +8,6 @@ FROM node:22-alpine
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY server.js lounge.js index.html ./
-# TV eşleşme anahtarı eklentinin kalıcı /data klasöründe tutulur.
+# The TV pairing key is kept in the add-on's persistent /data folder.
 ENV KEY_FILE=/data/tv-key
 CMD ["node", "server.js"]

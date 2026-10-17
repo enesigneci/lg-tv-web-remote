@@ -1,5 +1,5 @@
 node_modules/
-# TV eşleşme anahtarı: TV'yi kontrol etme yetkisi verir, asla paylaşma.
+# TV pairing key: grants control of the TV, never share it.
 tv-key
 *.log
 .DS_Store

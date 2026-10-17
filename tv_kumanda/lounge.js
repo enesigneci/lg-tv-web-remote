@@ -1,7 +1,7 @@
 'use strict';
 
-// YouTube Lounge API: telefondaki YouTube uygulamasının "TV'de oynat" için kullandığı yol.
-// TV'nin screenId'si DIAL üzerinden alınır, ondan lounge token, ondan da oturum açılır.
+// YouTube Lounge API: what the YouTube phone app uses for "Play on TV".
+// The TV's screenId comes from DIAL; it is exchanged for a lounge token, which opens a session.
 
 const crypto = require('crypto');
 
@@ -15,7 +15,7 @@ async function getScreenId(tvHost) {
         headers: { Origin: 'package:com.google.android.youtube' },
     });
     const m = (await r.text()).match(/<screenId>([^<]+)<\/screenId>/);
-    if (!m) throw new Error('TV screenId vermedi (YouTube açık mı?)');
+    if (!m) throw new Error('TV did not return a screenId (is YouTube installed?)');
     return m[1];
 }
 
@@ -56,7 +56,7 @@ async function connect(tvHost) {
     const text = await r.text();
     const sid = text.match(/\["c","([^"]+)"/);
     const gs = text.match(/\["S","([^"]+)"/);
-    if (!sid || !gs) throw new Error('Lounge oturumu açılamadı: ' + text.slice(0, 200));
+    if (!sid || !gs) throw new Error('Could not open lounge session: ' + text.slice(0, 200));
     session.sid = sid[1];
     session.gsessionid = gs[1];
 }
@@ -72,9 +72,9 @@ async function command(tvHost, sc, args) {
             body,
         });
         if (r.ok) return;
-        session = null; // oturum düşmüş, bir kez yeniden bağlan
+        session = null; // session expired, reconnect once
     }
-    throw new Error('YouTube komutu gönderilemedi');
+    throw new Error('Could not send YouTube command');
 }
 
 function play(tvHost, videoId) {
