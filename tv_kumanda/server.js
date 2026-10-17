@@ -468,10 +468,13 @@ server.listen(PORT, () => {
     // Announce the hostname via mDNS; works on both macOS and Linux.
     if (ip) {
         const mdns = multicastDns();
+        const a = { name: HOSTNAME, type: 'A', ttl: 120, flush: true, data: ip };
+        // Tells resolvers there is no IPv6 address, so AAAA lookups don't stall for seconds (RFC 6762 §6.1).
+        const nsec = { name: HOSTNAME, type: 'NSEC', ttl: 120, flush: true, data: { nextDomain: HOSTNAME, rrtypes: ['A'] } };
         mdns.on('query', (query) => {
-            const asked = query.questions.some((q) =>
-                q.name.toLowerCase() === HOSTNAME && (q.type === 'A' || q.type === 'ANY'));
-            if (asked) mdns.respond({ answers: [{ name: HOSTNAME, type: 'A', ttl: 120, flush: true, data: ip }] });
+            const types = query.questions.filter((q) => q.name.toLowerCase() === HOSTNAME).map((q) => q.type);
+            if (types.includes('A') || types.includes('ANY')) mdns.respond({ answers: [a], additionals: [nsec] });
+            else if (types.includes('AAAA')) mdns.respond({ answers: [nsec], additionals: [a] });
         });
         mdns.on('error', (err) => console.log('mDNS error:', err.message));
     }
