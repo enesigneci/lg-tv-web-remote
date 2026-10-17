@@ -71,7 +71,7 @@ Environment variables: `TV_HOST`, `TV_MAC`, `PORT`, `MDNS_NAME`, `KEY_FILE`, `SE
 
 ## Notifications on the TV
 
-`POST /notify` shows a message in the middle of the TV screen that closes itself after a few seconds:
+The **Message on TV** box at the bottom of the Remote tab sends a message with an optional title, and you can choose how long it stays on screen. The same thing is available as an HTTP endpoint: `POST /notify` shows a message in the middle of the TV screen that closes itself after a few seconds:
 
 ```bash
 curl -X POST http://kumanda.local/notify -H 'Content-Type: application/json' \

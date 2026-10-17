@@ -59,6 +59,12 @@
   .app img { width:52px; height:52px; object-fit:contain; border-radius:10px; }
   .app span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .app.off { opacity:.45; }
+  #kbView h2 { margin-top:22px; }
+  #msgForm { display:flex; flex-direction:column; gap:8px; }
+  #msgForm .field { font-size:17px; padding:12px; font-family:inherit; }
+  #msgForm textarea { resize:vertical; min-height:72px; }
+  .msgRow { display:grid; grid-template-columns:110px 1fr; gap:8px; }
+  .msgRow button { padding:12px 0; }
   #chTools { display:flex; gap:8px; margin-bottom:12px; }
   #chTools input { flex:1; min-width:0; font-size:17px; padding:12px; }
   #chRadio { padding:0 14px; font-size:14px; }
@@ -125,6 +131,23 @@
     <button data-btn="PAUSE" data-i18n-aria="pause">⏸</button>
     <button data-btn="FASTFORWARD" data-i18n-aria="forward">⏩</button>
   </div>
+
+  <h2 data-i18n="msgTitle"></h2>
+  <form id="msgForm">
+    <input id="msgHead" class="field" type="text" data-i18n-ph="msgHeadPh" autocomplete="off" maxlength="80">
+    <textarea id="msgText" class="field" rows="3" data-i18n-ph="msgTextPh" maxlength="300" required></textarea>
+    <div class="msgRow">
+      <select id="msgSecs" class="field" data-i18n-aria="msgSecs">
+        <option value="5">5 sn</option>
+        <option value="10">10 sn</option>
+        <option value="15" selected>15 sn</option>
+        <option value="30">30 sn</option>
+        <option value="60">60 sn</option>
+      </select>
+      <button class="primary" data-i18n="msgSend"></button>
+    </div>
+    <div id="msgStatus" class="hint"></div>
+  </form>
 </section>
 
 <section id="ytView" class="hidden">
@@ -185,6 +208,9 @@
       webHint: "Adres yazarsan TV tarayıcısında açılır, başka bir şey yazarsan {engine}'te aranır. YouTube linki YouTube uygulamasında açılır.",
       touchpad: 'Touchpad<br>Sürükle: imleç · Dokun: tıkla<br>İki parmak: kaydır',
       appsEmpty: 'TV bağlanınca uygulamalar burada görünür.', inputs: 'Girişler', apps: 'Uygulamalar',
+      msgTitle: "TV'ye mesaj", msgHeadPh: 'Başlık (isteğe bağlı)', msgTextPh: "TV'de görünecek mesaj",
+      msgSecs: 'Ekranda kalma süresi', msgSend: 'Gönder', msgSent: "Gönderildi, TV'de görünüyor.",
+      msgOff: 'TV bağlı değil, mesaj gönderilemedi.', msgFailed: 'Mesaj gönderilemedi.',
       tabChannels: '📺 Kanal', chSearch: 'Kanal ara', radio: 'Radyo', noInfo: 'Yayın bilgisi yok', next: 'Sonra',
       chEmpty: 'TV bağlanınca kanal listesi burada görünür.',
     },
@@ -203,6 +229,9 @@
       webHint: 'Addresses open in the TV browser; anything else is searched on {engine}. YouTube links open in the YouTube app.',
       touchpad: 'Touchpad<br>Drag: move cursor · Tap: click<br>Two fingers: scroll',
       appsEmpty: 'Apps appear here once the TV is connected.', inputs: 'Inputs', apps: 'Apps',
+      msgTitle: 'Message on TV', msgHeadPh: 'Title (optional)', msgTextPh: 'Message to show on the TV',
+      msgSecs: 'How long it stays on screen', msgSend: 'Send', msgSent: 'Sent, showing on the TV.',
+      msgOff: 'TV not connected, message not sent.', msgFailed: 'Could not send the message.',
       tabChannels: '📺 TV', chSearch: 'Search channels', radio: 'Radio', noInfo: 'No program info', next: 'Next',
       chEmpty: 'Channels appear here once the TV is connected.',
     },
@@ -222,6 +251,7 @@
     document.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
     document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     document.getElementById('lang').textContent = lang === 'tr' ? 'EN' : 'TR';
+    for (const o of document.querySelectorAll('#msgSecs option')) o.textContent = `${o.value} ${lang === 'tr' ? 'sn' : 's'}`;
     setStatus(statusKey);
     setVolume(volumeState);
     if (channels.length) renderChannels();
@@ -340,6 +370,24 @@
   tabApps.onclick = () => show('apps');
   tabCh.onclick = () => show('ch');
   try { const t = localStorage.getItem('tab'); if (tabs[t]) show(t); } catch {}
+
+  msgForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const message = msgText.value.trim();
+    if (!message) return;
+    msgStatus.textContent = '';
+    try {
+      const res = await fetch('/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: msgHead.value.trim(), message, seconds: Number(msgSecs.value) }),
+      });
+      msgStatus.textContent = res.ok ? t('msgSent') : res.status === 503 ? t('msgOff') : t('msgFailed');
+      if (res.ok) { msgText.value = ''; msgText.blur(); }
+    } catch {
+      msgStatus.textContent = t('msgFailed');
+    }
+  });
 
   webForm.addEventListener('submit', (e) => {
     e.preventDefault();
