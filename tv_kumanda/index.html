@@ -35,8 +35,9 @@
   .hidden { display:none !important; }
   .bar { display:grid; grid-template-columns:1fr 1.1fr 1fr 1.1fr; gap:8px; margin-bottom:14px; }
   .bar button { padding:12px 0; font-size:17px; }
-  #mute { font-variant-numeric:tabular-nums; }
-  #mute.muted { color:#fc3; }
+  #mute.muted { background:#3a3214; color:#fc3; }
+  .meta { display:flex; align-items:center; gap:12px; }
+  #volume { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
   #power { background:#3a1414; color:#ff6b6b; }
   #ytForm, #webForm { display:flex; gap:8px; }
   #ytForm input, #webForm input { flex:1; min-width:0; }
@@ -62,7 +63,10 @@
 <body>
 <header>
   <h1>TV Kumanda</h1>
-  <span id="status">bağlanıyor…</span>
+  <div class="meta">
+    <span id="volume"></span>
+    <span id="status">bağlanıyor…</span>
+  </div>
 </header>
 
 <div class="bar">
@@ -154,9 +158,10 @@
   }
 
   function setVolume(v) {
-    if (!v) { mute.textContent = '🔇'; mute.classList.remove('muted'); return; }
-    mute.textContent = v.muted ? '🔇 ' + v.level : '🔈 ' + v.level;
-    mute.classList.toggle('muted', !!v.muted);
+    // Mute tuşu sadece sessiz durumunu gösterir; seviye başlıkta ayrı durur.
+    mute.classList.toggle('muted', !!(v && v.muted));
+    mute.setAttribute('aria-pressed', v && v.muted ? 'true' : 'false');
+    volume.textContent = !v ? '' : v.muted ? '🔇 Sessiz' : `🔊 ${v.level}`;
   }
 
   function renderApps(list) {
