@@ -39,6 +39,9 @@ let tvReady = false;
 let pointer = null;
 let volume = null; // { level, muted }
 let apps = [];     // { id, title, kind: 'app' | 'input' } — icon URLs live in iconUrls
+let channels = []; // { id, number, name, radio }
+let currentChannel = null;
+const epgCache = new Map(); // channelId -> { at, programs: [{ title, start, end }] }
 const iconUrls = new Map();
 const iconCache = new Map();
 
@@ -69,6 +72,13 @@ function startTv() {
             broadcast({ volume });
         });
         loadApps().catch((err) => console.log('Could not load app list:', err.message));
+        loadChannels().catch((err) => console.log('Could not load channel list:', err.message));
+        // Only answers while Live TV is in the foreground; errors otherwise are expected.
+        tv.subscribe('ssap://tv/getCurrentChannel', (err, res) => {
+            if (err || !res || !res.channelId) return;
+            currentChannel = res.channelId;
+            broadcast({ currentChannel });
+        });
         try {
             pointer = await tv.getSocket('ssap://com.webos.service.networkinput/getPointerInputSocket');
         } catch (err) {
@@ -178,6 +188,37 @@ async function resolveTv() {
     console.log(`TV: ${TV_HOST}${TV_MAC ? ` (MAC ${TV_MAC})` : ' (MAC unknown, power-on will not work)'}`);
 }
 
+
+async function loadChannels() {
+    const res = await tv.request('ssap://tv/getChannelList');
+    channels = (res.channelList || [])
+        .filter((c) => !c.skipped && !c.Invisible)
+        .map((c) => ({ id: c.channelId, number: c.channelNumber, name: c.channelName, radio: !!c.Radio }));
+    broadcast({ channels });
+}
+
+// EPG times come as "YYYY,MM,DD,hh,mm,ss" in UTC.
+function epgTime(t) {
+    const [y, mo, d, h, mi, se] = String(t).split(',').map(Number);
+    return Date.UTC(y, mo - 1, d, h, mi, se);
+}
+
+async function channelEpg(id) {
+    const cached = epgCache.get(id);
+    const now = Date.now();
+    // Refetch when the cached "now" program has ended or after 30 minutes.
+    if (cached && now - cached.at < 30 * 60 * 1000 && (!cached.programs[0] || cached.programs[0].end > now)) {
+        return cached.programs;
+    }
+    const res = await tv.request('ssap://tv/getChannelProgramInfo', { channelId: id }).catch(() => ({}));
+    const programs = (res.programList || [])
+        .map((p) => ({ title: p.programName, start: epgTime(p.startTime), end: epgTime(p.endTime) }))
+        .filter((p) => p.end > now)
+        .sort((a, b) => a.start - b.start)
+        .slice(0, 2);
+    epgCache.set(id, { at: now, programs });
+    return programs;
+}
 
 async function loadApps() {
     const list = [];
@@ -301,6 +342,9 @@ function handle(msg) {
             case 'launch':
                 await req('ssap://system.launcher/launch', { id: msg.id });
                 break;
+            case 'channel':
+                await req('ssap://tv/openChannel', { channelId: msg.id });
+                break;
             case 'input':
                 await req('ssap://tv/switchInput', { inputId: msg.id });
                 break;
@@ -357,6 +401,18 @@ async function youtubeSearch(q, hl = 'en') {
 
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
+    if (url.pathname === '/epg') {
+        // Current and next program for the requested channels (the ones visible on the phone).
+        const ids = (url.searchParams.get('ids') || '').split(',').filter(Boolean).slice(0, 40);
+        const out = {};
+        for (const id of ids) {
+            if (!tvReady) break;
+            out[id] = await channelEpg(id);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(out));
+        return;
+    }
     if (url.pathname === '/icon') {
         const key = url.searchParams.get('k');
         try {
@@ -390,7 +446,7 @@ const server = http.createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ server });
 wss.on('connection', (ws) => {
-    ws.send(JSON.stringify({ status: tvReady ? 'connected' : 'disconnected', volume, apps, searchEngine: SEARCH.name }));
+    ws.send(JSON.stringify({ status: tvReady ? 'connected' : 'disconnected', volume, apps, channels, currentChannel, searchEngine: SEARCH.name }));
     ws.on('message', (data) => {
         try {
             handle(JSON.parse(data));

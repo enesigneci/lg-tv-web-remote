@@ -29,8 +29,8 @@
   button.primary { background:var(--accent); }
   .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:300px; margin:18px auto; }
   .pad button { aspect-ratio:1.4; font-size:22px; }
-  .tabs { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; background:#1b1b1b; padding:4px; border-radius:12px; margin-bottom:14px; }
-  .tabs button { padding:10px 0; font-size:13px; background:transparent; }
+  .tabs { display:grid; grid-template-columns:repeat(5,1fr); gap:4px; background:#1b1b1b; padding:4px; border-radius:12px; margin-bottom:14px; }
+  .tabs button { padding:10px 0; font-size:12px; background:transparent; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tabs button.on { background:var(--btn-active); }
   .hidden { display:none !important; }
   .bar { display:grid; grid-template-columns:1fr 1.1fr 1fr 1.1fr; gap:8px; margin-bottom:14px; }
@@ -59,6 +59,18 @@
   .app img { width:52px; height:52px; object-fit:contain; border-radius:10px; }
   .app span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .app.off { opacity:.45; }
+  #chTools { display:flex; gap:8px; margin-bottom:12px; }
+  #chTools input { flex:1; min-width:0; font-size:17px; padding:12px; }
+  #chRadio { padding:0 14px; font-size:14px; }
+  #chRadio.on { background:var(--btn-active); color:#fc3; }
+  #chList { display:flex; flex-direction:column; gap:8px; }
+  .ch { display:grid; grid-template-columns:40px 1fr; grid-template-rows:auto auto auto; gap:3px 10px; align-items:center; text-align:left; padding:10px 14px; }
+  .ch.current { outline:2px solid var(--accent); }
+  .ch .num { grid-row:1 / 4; font-size:15px; color:var(--muted); font-variant-numeric:tabular-nums; text-align:right; }
+  .ch .name { font-size:16px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ch .now { font-size:13px; color:var(--muted); min-height:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ch .bar { display:block; grid-column:2; height:3px; margin:3px 0 2px; background:#333; border-radius:2px; overflow:hidden; }
+  .ch .bar i { display:block; height:100%; width:0; background:var(--accent); }
 </style>
 </head>
 <body>
@@ -82,6 +94,7 @@
   <button id="tabKb" class="on" data-i18n="tabRemote"></button>
   <button id="tabYt">▶ YouTube</button>
   <button id="tabWeb">🌐 Web</button>
+  <button id="tabCh" data-i18n="tabChannels"></button>
   <button id="tabApps" data-i18n="tabApps"></button>
 </div>
 
@@ -138,6 +151,15 @@
   </div>
 </section>
 
+<section id="chView" class="hidden">
+  <div id="chTools">
+    <input id="chQ" class="field" type="search" data-i18n-ph="chSearch" autocomplete="off">
+    <button id="chRadio" data-i18n="radio"></button>
+  </div>
+  <div id="chEmpty" class="hint" data-i18n="chEmpty"></div>
+  <div id="chList"></div>
+</section>
+
 <section id="appsView" class="hidden">
   <div id="appsEmpty" class="hint" data-i18n="appsEmpty"></div>
   <h2 id="inputsTitle" class="hidden" data-i18n="inputs"></h2>
@@ -152,7 +174,7 @@
       title: 'TV Kumanda', connected: 'TV bağlı', prompt: "TV'de isteği onayla", disconnected: 'TV bağlı değil',
       offline: 'sunucu yok', connecting: 'bağlanıyor…', muted: 'Sessiz',
       volDown: 'Sesi kıs', mute: 'Sessiz', volUp: 'Sesi aç', power: '⏻ Güç', powerAria: "TV'yi aç/kapat",
-      tabRemote: '⌨ Kumanda', tabApps: '▦ Uygulama',
+      tabRemote: '⌨ Kumanda', tabApps: '▦ Uyg.',
       typeHere: "Buraya yaz, TV'de görünsün",
       typeHint: "TV'de önce bir arama kutusu seç, ekran klavyesi açılsın. Sonra buraya yaz.",
       delete: '⌫ Sil', clear: 'Temizle', back: '↩ Geri', home: '⌂ Ana', settings: '⚙ Ayar',
@@ -163,6 +185,8 @@
       webHint: "Adres yazarsan TV tarayıcısında açılır, başka bir şey yazarsan {engine}'te aranır. YouTube linki YouTube uygulamasında açılır.",
       touchpad: 'Touchpad<br>Sürükle: imleç · Dokun: tıkla<br>İki parmak: kaydır',
       appsEmpty: 'TV bağlanınca uygulamalar burada görünür.', inputs: 'Girişler', apps: 'Uygulamalar',
+      tabChannels: '📺 Kanal', chSearch: 'Kanal ara', radio: 'Radyo', noInfo: 'Yayın bilgisi yok', next: 'Sonra',
+      chEmpty: 'TV bağlanınca kanal listesi burada görünür.',
     },
     en: {
       title: 'TV Remote', connected: 'TV connected', prompt: 'Accept the request on the TV', disconnected: 'TV not connected',
@@ -179,6 +203,8 @@
       webHint: 'Addresses open in the TV browser; anything else is searched on {engine}. YouTube links open in the YouTube app.',
       touchpad: 'Touchpad<br>Drag: move cursor · Tap: click<br>Two fingers: scroll',
       appsEmpty: 'Apps appear here once the TV is connected.', inputs: 'Inputs', apps: 'Apps',
+      tabChannels: '📺 TV', chSearch: 'Search channels', radio: 'Radio', noInfo: 'No program info', next: 'Next',
+      chEmpty: 'Channels appear here once the TV is connected.',
     },
   };
 
@@ -186,6 +212,7 @@
   let lang = (navigator.language || '').toLowerCase().startsWith('tr') ? 'tr' : 'en';
   try { const saved = localStorage.getItem('lang'); if (STRINGS[saved]) lang = saved; } catch {}
   let engine = 'Yandex', statusKey = 'connecting', volumeState = null;
+  let channels = [], current = null, showRadio = false;
   const t = (key, vars = {}) => STRINGS[lang][key].replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
 
   function applyLang() {
@@ -197,6 +224,7 @@
     document.getElementById('lang').textContent = lang === 'tr' ? 'EN' : 'TR';
     setStatus(statusKey);
     setVolume(volumeState);
+    if (channels.length) renderChannels();
   }
 
   const input = document.getElementById('text');
@@ -246,6 +274,8 @@
       if (m.status) setStatus(m.status);
       if ('volume' in m) setVolume(m.volume);
       if (m.apps) renderApps(m.apps);
+      if (m.channels) { channels = m.channels; renderChannels(); }
+      if ('currentChannel' in m) markCurrent(m.currentChannel);
       if (m.searchEngine) { engine = m.searchEngine; applyLang(); }
     };
     ws.onclose = () => { setStatus('offline'); setTimeout(connect, 1500); };
@@ -296,7 +326,7 @@
   }));
   power.onclick = () => { if (navigator.vibrate) navigator.vibrate(30); send({ type: 'power' }); };
 
-  const tabs = { kb: [tabKb, kbView], yt: [tabYt, ytView], web: [tabWeb, webView], apps: [tabApps, appsView] };
+  const tabs = { kb: [tabKb, kbView], yt: [tabYt, ytView], web: [tabWeb, webView], ch: [tabCh, chView], apps: [tabApps, appsView] };
   function show(name) {
     for (const [k, [tab, view]] of Object.entries(tabs)) {
       tab.classList.toggle('on', k === name);
@@ -308,6 +338,7 @@
   tabYt.onclick = () => { show('yt'); ytQ.focus(); };
   tabWeb.onclick = () => show('web');
   tabApps.onclick = () => show('apps');
+  tabCh.onclick = () => show('ch');
   try { const t = localStorage.getItem('tab'); if (tabs[t]) show(t); } catch {}
 
   webForm.addEventListener('submit', (e) => {
@@ -341,6 +372,84 @@
       }
     } catch { ytResults.textContent = t('searchFailed'); }
   });
+
+  // Channels: the list comes from the TV; program info is fetched only for rows on screen.
+  const epg = new Map(), wanted = new Set();
+  const fmt = (ms) => new Date(ms).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
+  const norm = (x) => x.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i');
+
+  const seen = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting && !epg.has(e.target.dataset.id)) wanted.add(e.target.dataset.id);
+    clearTimeout(seen.timer);
+    seen.timer = setTimeout(fetchEpg, 150);
+  });
+
+  async function fetchEpg() {
+    const ids = [...wanted].slice(0, 40);
+    if (!ids.length) return;
+    ids.forEach((id) => wanted.delete(id));
+    try {
+      const data = await (await fetch('/epg?ids=' + encodeURIComponent(ids.join(',')))).json();
+      for (const [id, programs] of Object.entries(data)) { epg.set(id, programs); paintRow(id); }
+    } catch {}
+    if (wanted.size) fetchEpg();
+  }
+
+  function paintRow(id) {
+    const row = chList.querySelector(`[data-id="${CSS.escape(id)}"]`);
+    if (!row) return;
+    const now = Date.now();
+    const progs = (epg.get(id) || []).filter((p) => p.end > now);
+    const [cur, nxt] = progs;
+    const nowEl = row.querySelector('.now'), bar = row.querySelector('.bar i');
+    if (!epg.has(id)) { nowEl.textContent = ''; return; }
+    if (!cur) { nowEl.textContent = t('noInfo'); bar.style.width = '0'; return; }
+    if (cur.start > now) {
+      nowEl.textContent = `${t('next')} ${fmt(cur.start)}: ${cur.title}`;
+      bar.style.width = '0';
+      return;
+    }
+    nowEl.textContent = `${fmt(cur.start)}–${fmt(cur.end)}  ${cur.title}` + (nxt ? `  ·  ${t('next')}: ${nxt.title}` : '');
+    bar.style.width = Math.min(100, (now - cur.start) / (cur.end - cur.start) * 100) + '%';
+  }
+
+  function renderChannels() {
+    chEmpty.classList.toggle('hidden', channels.length > 0);
+    const q = norm(chQ.value.trim());
+    const list = channels.filter((c) => c.radio === showRadio && (!q || norm(c.name).includes(q) || c.number.startsWith(q)));
+    seen.disconnect();
+    chList.textContent = '';
+    for (const c of list) {
+      const b = document.createElement('button');
+      b.className = 'ch' + (c.id === current ? ' current' : '');
+      b.dataset.id = c.id;
+      b.innerHTML = '<span class="num"></span><span class="name"></span><span class="now"></span><span class="bar"><i></i></span>';
+      b.querySelector('.num').textContent = c.number;
+      b.querySelector('.name').textContent = c.name;
+      b.onclick = () => { if (navigator.vibrate) navigator.vibrate(10); send({ type: 'channel', id: c.id }); markCurrent(c.id); };
+      chList.append(b);
+      paintRow(c.id);
+      seen.observe(b);
+    }
+  }
+
+  function markCurrent(id) {
+    current = id;
+    chList.querySelectorAll('.ch').forEach((b) => b.classList.toggle('current', b.dataset.id === id));
+  }
+
+  chQ.addEventListener('input', renderChannels);
+  chRadio.onclick = () => { showRadio = !showRadio; chRadio.classList.toggle('on', showRadio); renderChannels(); };
+  // Keep progress bars moving and pick up the next program when one ends.
+  setInterval(() => {
+    const now = Date.now();
+    for (const b of chList.querySelectorAll('.ch')) {
+      const progs = epg.get(b.dataset.id);
+      if (progs && progs[0] && progs[0].end <= now && !progs[1]) { epg.delete(b.dataset.id); wanted.add(b.dataset.id); }
+      paintRow(b.dataset.id);
+    }
+    fetchEpg();
+  }, 60000);
 
   // Touchpad: one finger moves the cursor, a short tap clicks, two fingers scroll.
   // Movement is accumulated and sent once per frame so the server isn't flooded.
