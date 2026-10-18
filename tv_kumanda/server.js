@@ -167,7 +167,15 @@ async function discoverTv() {
     return discoverMdns();
 }
 
+// Last discovered TV, kept next to the pairing key. Discovery can miss a TV that is in standby
+// or slow to answer, and without the MAC the power button could not wake it.
+const TV_CACHE = path.join(path.dirname(process.env.KEY_FILE || path.join(__dirname, 'tv-key')), 'tv.json');
+
 async function resolveTv() {
+    let cached = {};
+    try {
+        cached = JSON.parse(fs.readFileSync(TV_CACHE, 'utf8'));
+    } catch {}
     while (!TV_HOST || !TV_MAC) {
         const tvs = await discoverTv();
         const match = TV_HOST ? tvs.find((t) => t.host === TV_HOST) : tvs[0];
@@ -180,6 +188,12 @@ async function resolveTv() {
             break;
         }
         if (TV_HOST) break; // IP was given but not seen in discovery; try ARP for the MAC
+        if (cached.host) {
+            TV_HOST = cached.host;
+            TV_MAC = TV_MAC || cached.mac || '';
+            console.log('TV not found by discovery, using the last known address.');
+            break;
+        }
         console.log('TV not found on the network, retrying in 10 s (is the TV on?)');
         await new Promise((r) => setTimeout(r, 10000));
     }
@@ -188,6 +202,11 @@ async function resolveTv() {
         TV_MAC = macFromArp(TV_HOST) || '';
     }
     console.log(`TV: ${TV_HOST}${TV_MAC ? ` (MAC ${TV_MAC})` : ' (MAC unknown, power-on will not work)'}`);
+    if (TV_MAC && (cached.host !== TV_HOST || cached.mac !== TV_MAC)) {
+        try {
+            fs.writeFileSync(TV_CACHE, JSON.stringify({ host: TV_HOST, mac: TV_MAC }));
+        } catch {}
+    }
 }
 
 

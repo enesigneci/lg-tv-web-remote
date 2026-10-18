@@ -3,3 +3,4 @@ node_modules/
 tv-key
 *.log
 .DS_Store
+tv.json
