@@ -1,5 +1,5 @@
 name: LG TV Web Remote
-version: "1.7.2"
+version: "1.8.0"
 slug: tv_kumanda
 description: Control an LG webOS TV from your phone's browser — keyboard, YouTube, web browser, apps, volume and power (http://kumanda.local)
 url: https://github.com/enesigneci/lg-tv-web-remote
@@ -11,6 +11,10 @@ startup: application
 boot: auto
 init: false
 host_network: true
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:remote-tv
+panel_title: TV Remote
 options:
   tv_host: ""
   tv_mac: ""

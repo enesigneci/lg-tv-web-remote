@@ -51,6 +51,24 @@ Options on the add-on's **Configuration** tab:
 | `port` | Web server port. Defaults to `80`. |
 | `search_engine` | Engine used for web searches: `yandex` (default), `google`, `duckduckgo` or `bing`. |
 
+#### Inside Home Assistant
+
+The remote also opens inside Home Assistant through ingress, so it works wherever Home Assistant does, including away from home through your remote access URL, and behind Home Assistant's login.
+
+- **Sidebar**: Turn on **Show in sidebar** on the add-on's **Info** tab to get a **TV Remote** entry.
+- **Dashboard card**: Add a button that opens the remote:
+
+  ```yaml
+  type: button
+  name: TV Remote
+  icon: mdi:remote-tv
+  tap_action:
+    action: navigate
+    navigation_path: /local_tv_kumanda
+  ```
+
+  The path is the add-on's slug, which is also the sidebar entry's address: `local_tv_kumanda` when the add-on is installed from a local folder, `<repository id>_tv_kumanda` when it's installed from the GitHub repository.
+
 ### On a computer (macOS, Linux, Raspberry Pi)
 
 Requires Node.js 18 or newer.

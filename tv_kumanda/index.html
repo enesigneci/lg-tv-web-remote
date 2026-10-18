@@ -288,7 +288,7 @@
         b.className = 'app' + (a.kind === 'input' && a.connected === false ? ' off' : '');
         b.innerHTML = '<img alt=""><span></span>';
         const img = b.querySelector('img');
-        img.src = `/icon?k=${encodeURIComponent(a.kind + ':' + a.id)}`;
+        img.src = `icon?k=${encodeURIComponent(a.kind + ':' + a.id)}`;
         img.onerror = () => img.remove();
         b.querySelector('span').textContent = a.title;
         b.onclick = () => send({ type: a.kind === 'input' ? 'input' : 'launch', id: a.id });
@@ -298,7 +298,8 @@
   }
 
   function connect() {
-    ws = new WebSocket(`ws://${location.host}`);
+    // Relative to the page so it also works inside Home Assistant's ingress panel (served over https).
+    ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${location.pathname}`);
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
       if (m.status) setStatus(m.status);
@@ -377,7 +378,7 @@
     if (!message) return;
     msgStatus.textContent = '';
     try {
-      const res = await fetch('/notify', {
+      const res = await fetch('notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: msgHead.value.trim(), message, seconds: Number(msgSecs.value) }),
@@ -406,7 +407,7 @@
     ytQ.blur();
     ytResults.textContent = t('searching');
     try {
-      const list = await (await fetch(`/yt?q=${encodeURIComponent(q)}&hl=${lang}`)).json();
+      const list = await (await fetch(`yt?q=${encodeURIComponent(q)}&hl=${lang}`)).json();
       ytResults.textContent = list.length ? '' : t('noResults');
       for (const v of list) {
         const b = document.createElement('button');
@@ -437,7 +438,7 @@
     if (!ids.length) return;
     ids.forEach((id) => wanted.delete(id));
     try {
-      const data = await (await fetch('/epg?ids=' + encodeURIComponent(ids.join(',')))).json();
+      const data = await (await fetch('epg?ids=' + encodeURIComponent(ids.join(',')))).json();
       for (const [id, programs] of Object.entries(data)) { epg.set(id, programs); paintRow(id); }
     } catch {}
     if (wanted.size) fetchEpg();

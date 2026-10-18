@@ -399,7 +399,7 @@ async function youtubeSearch(q, hl = 'en') {
     return out;
 }
 
-const server = http.createServer(async (req, res) => {
+async function handleRequest(req, res) {
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/notify' && req.method === 'POST') {
         // Shows a message on the TV, e.g. from a Home Assistant rest_command.
@@ -473,9 +473,22 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(page);
-});
+}
 
-const wss = new WebSocketServer({ server });
+const server = http.createServer(handleRequest);
+const wss = new WebSocketServer({ noServer: true });
+const upgrade = (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+server.on('upgrade', upgrade);
+
+// Home Assistant's ingress panel (sidebar / dashboard card) proxies to this port.
+const INGRESS_PORT = Number(process.env.INGRESS_PORT) || 0;
+if (INGRESS_PORT && INGRESS_PORT !== PORT) {
+    const ingress = http.createServer(handleRequest);
+    ingress.on('upgrade', upgrade);
+    ingress.on('error', (err) => console.log('Ingress server error:', err.message));
+    ingress.listen(INGRESS_PORT);
+}
+
 wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ status: tvReady ? 'connected' : 'disconnected', volume, apps, channels, currentChannel, searchEngine: SEARCH.name }));
     ws.on('message', (data) => {
