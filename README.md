@@ -23,7 +23,7 @@ Built and tested with an LG C4 (OLED55C46LA, webOS 24). Older webOS TVs (2014–
 - **Volume and power**: Volume up/down, mute and a live volume level. The power button turns the TV off, or wakes it with Wake-on-LAN when it's off.
 - **English and Turkish**: The interface follows your phone's language. Switch it with the TR/EN button in the header; the choice is remembered.
 
-The TV's IP and MAC address are discovered automatically: SSDP first, then mDNS (the TV's AirPlay advertisement), with the MAC address read from the ARP table.
+The TV's IP and MAC address are discovered automatically: SSDP first, then mDNS (the TV's AirPlay advertisement), with the MAC address read from the ARP table. The last address found is remembered, because TVs in standby stop announcing themselves.
 
 ## TV settings
 
@@ -36,10 +36,13 @@ The TV's IP and MAC address are discovered automatically: SSDP first, then mDNS 
 
 The server runs alongside Home Assistant and starts automatically on boot.
 
-1. In Home Assistant, go to **Settings → Add-ons → Add-on Store → ⋮ → Repositories**.
-2. Add `https://github.com/enesigneci/lg-tv-web-remote`.
-3. Install and start the **LG TV Web Remote** add-on.
-4. Open **http://kumanda.local** on your phone. If the name doesn't resolve, use your Home Assistant IP address.
+[![Add repository to my Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fenesigneci%2Flg-tv-web-remote)
+
+1. Click the button above, or in Home Assistant go to **Settings → Add-ons → Add-on Store → ⋮ → Repositories** and add `https://github.com/enesigneci/lg-tv-web-remote`.
+2. Install and start the **LG TV Web Remote** add-on.
+3. Open **http://kumanda.local** on your phone. If the name doesn't resolve, use your Home Assistant IP address.
+
+The add-on's **Documentation** tab covers setup, options and troubleshooting.
 
 Options on the add-on's **Configuration** tab:
 
@@ -104,12 +107,13 @@ rest_command:
     url: http://kumanda.local/notify
     method: POST
     content_type: application/json
-    payload: '{"title": "{{ title }}", "message": "{{ message }}"}'
+    payload: >-
+      {"title": {{ title | default("") | tojson }}, "message": {{ message | tojson }}, "seconds": {{ seconds | default(15) }}}
 ```
 
 ## How it works
 
-- The server talks to the TV over the **webOS SSAP** protocol (`wss://TV:3001`) using the [lgtv2](https://github.com/hobbyquaker/lgtv2) library. Text goes through `com.webos.service.ime`; keys and the touchpad use the network input socket.
+- The server talks to the TV over the **webOS SSAP** protocol (`wss://TV:3001`, falling back to `ws://TV:3000` on older sets) using the [lgtv2](https://github.com/hobbyquaker/lgtv2) library. Text goes through `com.webos.service.ime`; keys and the touchpad use the network input socket.
 - YouTube videos are sent with the **YouTube Lounge API**, the same mechanism the YouTube phone app uses for "Play on TV". The TV's screen ID comes from DIAL.
 - The `kumanda.local` name is announced by an mDNS responder running inside the server, so there's no need to rename your computer or Home Assistant host.
 
