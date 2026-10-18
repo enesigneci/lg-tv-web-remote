@@ -51,8 +51,10 @@ function broadcast(msg) {
 }
 
 function startTv() {
+    // Passing host (not a URL) lets lgtv2 try wss://host:3001 (2018+ firmware) first and fall
+    // back to ws://host:3000 for 2014–2017 TVs, keeping whichever works.
     tv = new LGTV({
-        url: `wss://${TV_HOST}:3001`,
+        host: TV_HOST,
         keyFile: process.env.KEY_FILE || path.join(__dirname, 'tv-key'),
         reconnect: 3000,
     });
@@ -240,7 +242,9 @@ async function loadApps() {
 // TV icons are served over self-signed HTTPS, which phones reject, so we proxy them.
 function fetchIcon(url) {
     return new Promise((resolve, reject) => {
-        https.get(url, { rejectUnauthorized: false }, (res) => {
+        // Newer TVs serve icons over self-signed HTTPS on 3001, older ones over plain HTTP on 3000.
+        const get = url.startsWith('https:') ? (u, cb) => https.get(u, { rejectUnauthorized: false }, cb) : http.get;
+        get(url, (res) => {
             if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
             const chunks = [];
             res.on('data', (c) => chunks.push(c));
@@ -420,10 +424,16 @@ async function handleRequest(req, res) {
         // goes on its own line and user text is escaped (newlines become <br>).
         const html = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '<br>');
         const title = String(opts.title || '').trim().slice(0, 80);
-        const result = await tv.request('ssap://system.notifications/createAlert', {
+        let result = await tv.request('ssap://system.notifications/createAlert', {
             message: title ? `${html(title)}<br>${html(message)}` : html(message),
             buttons: [{ label: 'OK', focus: true, buttonType: 'ok' }],
         }).catch((err) => ({ error: err.message }));
+        if (result.error) {
+            // Older webOS has no createAlert; fall back to a corner toast with plain text.
+            result = await tv.request('ssap://system.notifications/createToast', {
+                message: title ? `${title}: ${message}` : message,
+            }).catch((err) => ({ error: err.message }));
+        }
         if (result.alertId) {
             setTimeout(() => tv.request('ssap://system.notifications/closeAlert', { alertId: result.alertId }).catch(() => {}), seconds * 1000);
         }

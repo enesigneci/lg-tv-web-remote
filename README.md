@@ -2,7 +2,7 @@
 
 A small local server that lets you control an LG webOS TV from your phone's browser. No app to install: on the same Wi-Fi, just open **http://kumanda.local** on your phone.
 
-Built and tested with an LG C4 (OLED55C46LA, webOS 24). It should work on other webOS TVs as well.
+Built and tested with an LG C4 (OLED55C46LA, webOS 24). Older webOS TVs (2014–2017) are supported in code: the server falls back from `wss://TV:3001` to `ws://TV:3000`, loads app icons over HTTP and uses a corner toast for notifications. These paths haven't been tested on a real older set yet, so reports are welcome.
 
 <p align="center">
   <img src="docs/screenshots/remote.png" width="160" alt="Remote tab with keyboard input, arrow keys and media keys">
